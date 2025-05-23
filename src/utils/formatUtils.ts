@@ -14,11 +14,11 @@ export const formatCurrencyWithCommas = (amount: number): string => {
 };
 
 /**
- * تنسيق التاريخ باللغة العربية أو الإنجليزية
+ * تنسيق التاريخ باللغة العربية
  */
-export const formatDate = (date: string | Date, language: string = 'ar'): string => {
+export const formatDate = (date: string | Date): string => {
   const d = new Date(date);
-  return d.toLocaleDateString(language === 'en' ? 'en-US' : 'ar-SA', {
+  return d.toLocaleDateString('ar-SA', {
     year: 'numeric',
     month: 'long',
     day: 'numeric'
