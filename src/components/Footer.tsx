@@ -2,7 +2,7 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
 import { useLanguage } from '@/contexts/LanguageContext';
-import AdPlaceholder from '@/components/AdPlaceholder'; // Import AdPlaceholder
+import AdPlaceholder from '@/components/AdPlaceholder';
 
 const Footer: React.FC = () => {
   const { t, isRTL } = useLanguage();
@@ -34,7 +34,7 @@ const Footer: React.FC = () => {
                 <li><Link to="/" className="hover:text-yellow-500 transition-colors duration-200 text-sm sm:text-base">{t('home')}</Link></li>
                 <li><Link to="/restaurants" className="hover:text-yellow-500 transition-colors duration-200 text-sm sm:text-base">{t('restaurants')}</Link></li>
                 <li><Link to="/products" className="hover:text-yellow-500 transition-colors duration-200 text-sm sm:text-base">{t('products')}</Link></li>
-                <li><Link to="/rewards" className="hover:text-yellow-500 transition-colors duration-200 text-sm sm:text-base">{t('rewards')}</Link></li>
+                <li><Link to="/coupons" className="hover:text-yellow-500 transition-colors duration-200 text-sm sm:text-base">{t('discounts')}</Link></li>
               </ul>
             </div>
             
@@ -44,7 +44,6 @@ const Footer: React.FC = () => {
                 <li><Link to="/terms-conditions" className="hover:text-yellow-500 transition-colors duration-200 text-sm sm:text-base">{t('termsConditions')}</Link></li>
                 <li><Link to="/privacy-policy" className="hover:text-yellow-500 transition-colors duration-200 text-sm sm:text-base">{t('privacyPolicy')}</Link></li>
                 <li><Link to="/cookie-policy" className="hover:text-yellow-500 transition-colors duration-200 text-sm sm:text-base">{t('cookiePolicy')}</Link></li>
-                <li><Link to="/team" className="hover:text-yellow-500 transition-colors duration-200 text-sm sm:text-base">{t('coreTeam')}</Link></li>
               </ul>
             </div>
             

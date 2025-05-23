@@ -297,6 +297,113 @@ export type Database = {
           },
         ]
       }
+      pending_foods: {
+        Row: {
+          admin_notes: string | null
+          category: string | null
+          created_at: string | null
+          description: string | null
+          id: string
+          image_url: string | null
+          name: string
+          owner_id: string | null
+          price: number
+          restaurant_id: string | null
+          reviewed_at: string | null
+          status: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          admin_notes?: string | null
+          category?: string | null
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          image_url?: string | null
+          name: string
+          owner_id?: string | null
+          price: number
+          restaurant_id?: string | null
+          reviewed_at?: string | null
+          status?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          admin_notes?: string | null
+          category?: string | null
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          image_url?: string | null
+          name?: string
+          owner_id?: string | null
+          price?: number
+          restaurant_id?: string | null
+          reviewed_at?: string | null
+          status?: string | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pending_foods_restaurant_id_fkey"
+            columns: ["restaurant_id"]
+            isOneToOne: false
+            referencedRelation: "restaurants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      pending_restaurants: {
+        Row: {
+          address: string | null
+          admin_notes: string | null
+          created_at: string | null
+          cuisine_type: string | null
+          description: string | null
+          email: string | null
+          id: string
+          image_url: string | null
+          name: string
+          owner_id: string | null
+          phone: string | null
+          reviewed_at: string | null
+          status: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          address?: string | null
+          admin_notes?: string | null
+          created_at?: string | null
+          cuisine_type?: string | null
+          description?: string | null
+          email?: string | null
+          id?: string
+          image_url?: string | null
+          name: string
+          owner_id?: string | null
+          phone?: string | null
+          reviewed_at?: string | null
+          status?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          address?: string | null
+          admin_notes?: string | null
+          created_at?: string | null
+          cuisine_type?: string | null
+          description?: string | null
+          email?: string | null
+          id?: string
+          image_url?: string | null
+          name?: string
+          owner_id?: string | null
+          phone?: string | null
+          reviewed_at?: string | null
+          status?: string | null
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
       points_history: {
         Row: {
           amount: number

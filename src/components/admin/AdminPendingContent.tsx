@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
-import { PendingRestaurant, PendingFood } from '@/types/coupons';
+import { PendingRestaurant, PendingFood } from '@/types/admin';
 import { supabase } from '@/integrations/supabase/client';
 import { Check, X, Clock, Store, UtensilsCrossed } from 'lucide-react';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
@@ -24,26 +24,40 @@ const AdminPendingContent: React.FC = () => {
   const fetchPendingContent = async () => {
     setIsLoading(true);
     try {
-      // Fetch pending restaurants
+      // Fetch pending restaurants using direct query
       const { data: restaurants, error: restaurantsError } = await supabase
-        .from('pending_restaurants')
-        .select('*')
-        .eq('status', 'pending')
-        .order('created_at', { ascending: false });
+        .rpc('get_pending_restaurants');
 
-      if (restaurantsError) throw restaurantsError;
+      if (restaurantsError) {
+        console.error('Error fetching restaurants:', restaurantsError);
+        // Fallback to direct table query
+        const { data: fallbackRestaurants } = await supabase
+          .from('pending_restaurants')
+          .select('*')
+          .eq('status', 'pending')
+          .order('created_at', { ascending: false });
+        setPendingRestaurants(fallbackRestaurants as PendingRestaurant[] || []);
+      } else {
+        setPendingRestaurants(restaurants as PendingRestaurant[] || []);
+      }
 
-      // Fetch pending foods
+      // Fetch pending foods using direct query
       const { data: foods, error: foodsError } = await supabase
-        .from('pending_foods')
-        .select('*')
-        .eq('status', 'pending')
-        .order('created_at', { ascending: false });
+        .rpc('get_pending_foods');
 
-      if (foodsError) throw foodsError;
+      if (foodsError) {
+        console.error('Error fetching foods:', foodsError);
+        // Fallback to direct table query
+        const { data: fallbackFoods } = await supabase
+          .from('pending_foods')
+          .select('*')
+          .eq('status', 'pending')
+          .order('created_at', { ascending: false });
+        setPendingFoods(fallbackFoods as PendingFood[] || []);
+      } else {
+        setPendingFoods(foods as PendingFood[] || []);
+      }
 
-      setPendingRestaurants(restaurants || []);
-      setPendingFoods(foods || []);
     } catch (error) {
       console.error('Error fetching pending content:', error);
       toast({
@@ -62,16 +76,29 @@ const AdminPendingContent: React.FC = () => {
     notes: string = ''
   ) => {
     try {
-      const { error } = await supabase
-        .from('pending_restaurants')
-        .update({
-          status: action,
-          admin_notes: notes,
-          reviewed_at: new Date().toISOString()
-        })
-        .eq('id', restaurantId);
+      // Update pending restaurant status
+      const { error: updateError } = await supabase
+        .rpc('update_pending_restaurant_status', {
+          restaurant_id: restaurantId,
+          new_status: action,
+          notes: notes
+        });
 
-      if (error) throw error;
+      if (updateError) {
+        console.error('Error using RPC, trying direct update:', updateError);
+        
+        // Fallback to direct update
+        const { error: directError } = await supabase
+          .from('pending_restaurants')
+          .update({
+            status: action,
+            admin_notes: notes,
+            reviewed_at: new Date().toISOString()
+          })
+          .eq('id', restaurantId);
+
+        if (directError) throw directError;
+      }
 
       // If approved, copy to main restaurants table
       if (action === 'approved') {
@@ -81,17 +108,19 @@ const AdminPendingContent: React.FC = () => {
             .from('restaurants')
             .insert({
               name: restaurant.name,
-              description: restaurant.description,
-              address: restaurant.address,
+              description: restaurant.description || '',
+              address: restaurant.address || '',
               phone: restaurant.phone,
-              email: restaurant.email,
-              image_url: restaurant.image_url,
-              cuisine_type: restaurant.cuisine_type,
+              logo_url: restaurant.image_url,
+              cuisine_type: restaurant.cuisine_type ? [restaurant.cuisine_type] : [],
               owner_id: restaurant.owner_id,
               is_active: true
             });
 
-          if (insertError) throw insertError;
+          if (insertError) {
+            console.error('Error inserting approved restaurant:', insertError);
+            throw insertError;
+          }
         }
       }
 
@@ -117,16 +146,29 @@ const AdminPendingContent: React.FC = () => {
     notes: string = ''
   ) => {
     try {
-      const { error } = await supabase
-        .from('pending_foods')
-        .update({
-          status: action,
-          admin_notes: notes,
-          reviewed_at: new Date().toISOString()
-        })
-        .eq('id', foodId);
+      // Update pending food status
+      const { error: updateError } = await supabase
+        .rpc('update_pending_food_status', {
+          food_id: foodId,
+          new_status: action,
+          notes: notes
+        });
 
-      if (error) throw error;
+      if (updateError) {
+        console.error('Error using RPC, trying direct update:', updateError);
+        
+        // Fallback to direct update
+        const { error: directError } = await supabase
+          .from('pending_foods')
+          .update({
+            status: action,
+            admin_notes: notes,
+            reviewed_at: new Date().toISOString()
+          })
+          .eq('id', foodId);
+
+        if (directError) throw directError;
+      }
 
       // If approved, copy to main products table
       if (action === 'approved') {
@@ -136,15 +178,18 @@ const AdminPendingContent: React.FC = () => {
             .from('products')
             .insert({
               name: food.name,
-              description: food.description,
+              description: food.description || '',
               price: food.price,
-              category: food.category,
-              image_url: food.image_url,
+              category_id: null, // Will need to map categories properly
+              image: food.image_url,
               restaurant_id: food.restaurant_id,
-              is_available: true
+              available: true
             });
 
-          if (insertError) throw insertError;
+          if (insertError) {
+            console.error('Error inserting approved food:', insertError);
+            throw insertError;
+          }
         }
       }
 
