@@ -1,4 +1,3 @@
-
 // Common interfaces and types used throughout the application
 
 export interface Product {
@@ -159,9 +158,13 @@ export interface RewardTier {
   benefits: string[];
 }
 
+// Updated UserPoints interface to include progression attributes
 export interface UserPoints {
   id: string;
   user_id: string;
   total: number;
   tier: RewardTier;
+  nextTier?: RewardTier | null;
+  pointsToNextTier?: number;
+  progressPercentage?: number;
 }

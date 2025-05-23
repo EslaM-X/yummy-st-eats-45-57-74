@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import Header from '@/components/Header';
 import Footer from '@/components/Footer';
@@ -40,12 +39,6 @@ const RewardsPage: React.FC = () => {
         const points = await RewardsService.getUserPoints(user.id);
         if (points) {
           setUserPoints(points);
-          
-          // Calculate progress
-          const progress = RewardsService.calculateProgress(points.total);
-          points.nextTier = progress.nextTier;
-          points.pointsToNextTier = progress.pointsToNextTier;
-          points.progressPercentage = progress.progressPercentage;
         }
         
         // Fetch points history

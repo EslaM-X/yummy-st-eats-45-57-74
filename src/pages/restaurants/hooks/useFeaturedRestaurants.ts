@@ -13,7 +13,8 @@ const allFeaturedRestaurants: (Restaurant & { country: string })[] = [
     imageUrl: 'https://images.unsplash.com/photo-1590846406792-0adc7f938f1d?auto=format&fit=crop&w=800',
     isNew: true,
     description: 'تخصص في المأكولات الشرقية التقليدية والمشويات الطازجة',
-    country: 'sa'
+    country: 'sa',
+    address: 'شارع الملك فهد، الرياض'
   },
   {
     id: '5',
@@ -24,7 +25,8 @@ const allFeaturedRestaurants: (Restaurant & { country: string })[] = [
     imageUrl: 'https://images.unsplash.com/photo-1544148103-0773bf10d330?auto=format&fit=crop&w=800',
     isNew: true,
     description: 'أطباق بحرية طازجة يومياً مع توابل خاصة',
-    country: 'eg'
+    country: 'eg',
+    address: 'شارع النيل، القاهرة'
   },
   {
     id: '2',
@@ -35,7 +37,8 @@ const allFeaturedRestaurants: (Restaurant & { country: string })[] = [
     imageUrl: 'https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?auto=format&fit=crop&w=800',
     discount: '15%',
     description: 'بيتزا إيطالية أصلية بعجينة طازجة وخبز في الفرن الحجري',
-    country: 'ae'
+    country: 'ae',
+    address: 'شارع الشيخ زايد، دبي'
   },
   {
     id: '3',
@@ -46,7 +49,8 @@ const allFeaturedRestaurants: (Restaurant & { country: string })[] = [
     imageUrl: 'https://images.unsplash.com/photo-1589840700256-699f5e431e2e?auto=format&fit=crop&w=800',
     isNew: true,
     description: 'أطباق سوشي فاخرة محضرة من قبل طهاة يابانيين محترفين',
-    country: 'kw'
+    country: 'kw',
+    address: 'شارع الخليج، الكويت'
   },
   {
     id: '4',
@@ -57,7 +61,8 @@ const allFeaturedRestaurants: (Restaurant & { country: string })[] = [
     imageUrl: 'https://images.unsplash.com/photo-1561758033-d89a9ad46330?auto=format&fit=crop&w=800',
     discount: '10%',
     description: 'برجر لحم بقري فاخر طازج 100% مع صلصات خاصة وخبز محضر يومياً',
-    country: 'qa'
+    country: 'qa',
+    address: 'الخليج الغربي، الدوحة'
   },
 ];
 

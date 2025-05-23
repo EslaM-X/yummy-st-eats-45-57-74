@@ -36,12 +36,20 @@ export class RewardsService {
       // Convert database record to frontend type
       const userTier = this.getUserTierByName(data.level);
       
-      return {
+      const userPoints: UserPoints = {
         id: data.id,
         user_id: userId,
         total: data.points,
         tier: userTier
       };
+      
+      // Calculate progress
+      const progress = this.calculateProgress(data.points);
+      userPoints.nextTier = progress.nextTier;
+      userPoints.pointsToNextTier = progress.pointsToNextTier;
+      userPoints.progressPercentage = progress.progressPercentage;
+      
+      return userPoints;
     } catch (error) {
       console.error('Exception fetching user points:', error);
       return null;
@@ -72,12 +80,20 @@ export class RewardsService {
         return null;
       }
       
-      return {
+      const userPoints: UserPoints = {
         id: data.id,
         user_id: data.user_id,
         total: data.points,
         tier: initialTier
       };
+      
+      // Calculate progress
+      const progress = this.calculateProgress(data.points);
+      userPoints.nextTier = progress.nextTier;
+      userPoints.pointsToNextTier = progress.pointsToNextTier;
+      userPoints.progressPercentage = progress.progressPercentage;
+      
+      return userPoints;
     } catch (error) {
       console.error('Exception initializing user points:', error);
       return null;
@@ -267,7 +283,7 @@ export class RewardsService {
         type: record.amount > 0 ? 'earned' : 'redeemed',
         points: Math.abs(record.amount),
         description: record.description,
-        date: record.created_at.split('T')[0] // Format as YYYY-MM-DD
+        date: record.created_at ? record.created_at.split('T')[0] : new Date().toISOString().split('T')[0] // Format as YYYY-MM-DD
       }));
     } catch (error) {
       console.error('Exception fetching points history:', error);
