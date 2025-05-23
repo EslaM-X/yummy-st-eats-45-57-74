@@ -12,7 +12,7 @@ import ProductsPage from './pages/ProductsPage';
 import CartPage from './pages/CartPage';
 import CheckoutPage from './pages/CheckoutPage';
 import RegisterRestaurantPage from './pages/RegisterRestaurantPage';
-import CouponsPage from './pages/CouponsPage'; // تم استبدال RewardsPage بـ CouponsPage
+import CouponsPage from './pages/CouponsPage';
 import ProfilePage from './pages/ProfilePage';
 import AuthPage from './pages/AuthPage';
 import ResetPasswordPage from './pages/ResetPasswordPage';
@@ -83,10 +83,11 @@ function App() {
           path="/profile" 
           element={user ? <ProfilePage /> : <Navigate to="/auth" />} 
         />
-        <Route path="/coupons" element={<CouponsPage />} /> {/* تم استبدال /rewards بـ /coupons */}
-        {/* إعادة توجيه المكافآت إلى الكوبونات للحفاظ على الروابط القديمة */}
+        <Route path="/coupons" element={<CouponsPage />} />
         <Route path="/rewards" element={<Navigate to="/coupons" replace />} />
         <Route path="/auth" element={<AuthPage />} />
+        {/* إضافة مسار login لإعادة التوجيه إلى صفحة المصادقة */}
+        <Route path="/login" element={<Navigate to="/auth" replace />} />
         <Route path="/reset-password" element={<ResetPasswordPage />} />
         <Route path="/admin-login" element={<AdminLoginPage />} />
         <Route path="/admin" element={<AdminPage />} />
@@ -106,7 +107,6 @@ function App() {
           path="/orders" 
           element={user ? <OrdersPage /> : <Navigate to="/auth" />} 
         />
-        {/* تم حذف مسار /team */}
         <Route path="*" element={<NotFound />} />
       </Routes>
       

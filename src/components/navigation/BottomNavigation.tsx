@@ -6,7 +6,7 @@ import {
   Home,
   UtensilsCrossed,
   ShoppingBag,
-  Ticket, // تم تغيير Gift إلى Ticket للكوبونات
+  Ticket,
   User
 } from 'lucide-react';
 import { useLanguage } from '@/contexts/LanguageContext';
@@ -26,7 +26,7 @@ export const BottomNavigation: React.FC = () => {
     { icon: Home, label: t('home'), path: '/' },
     { icon: UtensilsCrossed, label: t('restaurants'), path: '/restaurants' },
     { icon: ShoppingBag, label: t('products'), path: '/products' },
-    { icon: Ticket, label: 'الكوبونات', path: '/coupons' }, // تم استبدال المكافآت بالكوبونات
+    { icon: Ticket, label: t('coupons'), path: '/coupons' },
     { icon: User, label: t('profile'), path: '/profile' },
   ];
 

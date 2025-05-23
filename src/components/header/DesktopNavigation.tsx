@@ -12,7 +12,7 @@ const DesktopNavigation = () => {
     { name: t('home'), href: '/' },
     { name: t('restaurants'), href: '/restaurants' },
     { name: t('products'), href: '/products' },
-    { name: 'الكوبونات', href: '/coupons' }, // تم استبدال المكافآت بالكوبونات
+    { name: t('coupons'), href: '/coupons' },
   ];
 
   return (
@@ -27,7 +27,6 @@ const DesktopNavigation = () => {
         </Link>
       ))}
       
-      {/* زر إضافة طعام مميز وجذاب */}
       <Link to="/add-food" className="relative group">
         <Button
           className="relative overflow-hidden bg-gradient-to-r from-amber-500 to-yellow-600 hover:from-amber-600 hover:to-yellow-700 text-white border-none transform hover:scale-105 transition-all duration-300 shadow-lg hover:shadow-xl"
