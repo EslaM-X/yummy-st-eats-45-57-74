@@ -587,6 +587,42 @@ export type Database = {
         }
         Relationships: []
       }
+      rewards: {
+        Row: {
+          created_at: string | null
+          description: string | null
+          expiry_date: string | null
+          id: string
+          image_url: string | null
+          is_active: boolean | null
+          name: string
+          points: number
+          type: string
+        }
+        Insert: {
+          created_at?: string | null
+          description?: string | null
+          expiry_date?: string | null
+          id?: string
+          image_url?: string | null
+          is_active?: boolean | null
+          name: string
+          points: number
+          type: string
+        }
+        Update: {
+          created_at?: string | null
+          description?: string | null
+          expiry_date?: string | null
+          id?: string
+          image_url?: string | null
+          is_active?: boolean | null
+          name?: string
+          points?: number
+          type?: string
+        }
+        Relationships: []
+      }
       transactions: {
         Row: {
           amount: number
@@ -639,7 +675,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      update_user_points: {
+        Args: { user_id_param: string; points_to_add: number }
+        Returns: number
+      }
     }
     Enums: {
       [_ in never]: never

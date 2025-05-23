@@ -1,6 +1,6 @@
 
 import { supabase } from '@/integrations/supabase/client';
-import { UserPoints, UserReward, PointTransaction, RewardTier } from '@/types';
+import { UserPoints, UserReward, PointTransaction, RewardTier, Reward, RewardPoints, PointsHistory } from '@/types';
 import { rewardTiers } from '@/mocks/rewardsData';
 
 /**
@@ -101,7 +101,7 @@ export class RewardsService {
   }
   
   /**
-   * Add points to user account
+   * Add points to user account using the database function
    */
   static async addPoints(
     userId: string, 
@@ -115,57 +115,18 @@ export class RewardsService {
         return { success: false };
       }
 
-      // First, get current points
-      const { data: currentData, error: fetchError } = await supabase
-        .from('reward_points')
-        .select('*')
-        .eq('user_id', userId)
-        .maybeSingle();
+      // Call the database function to update points
+      const { data, error } = await supabase
+        .rpc('update_user_points', { 
+          user_id_param: userId, 
+          points_to_add: points 
+        });
       
-      if (fetchError) {
-        console.error('Error fetching current points:', fetchError);
+      if (error) {
+        console.error('Error adding points:', error);
         return { success: false };
       }
 
-      let newTotal = points;
-      let lifetimePoints = points;
-      
-      // Update existing record or create new one
-      if (currentData) {
-        newTotal = currentData.points + points;
-        lifetimePoints = currentData.lifetime_points + points;
-        
-        const { error: updateError } = await supabase
-          .from('reward_points')
-          .update({ 
-            points: newTotal,
-            lifetime_points: lifetimePoints,
-            level: this.calculateLevel(lifetimePoints),
-            updated_at: new Date().toISOString()
-          })
-          .eq('id', currentData.id);
-        
-        if (updateError) {
-          console.error('Error updating points:', updateError);
-          return { success: false };
-        }
-      } else {
-        // Create new record if it doesn't exist
-        const { error: insertError } = await supabase
-          .from('reward_points')
-          .insert({
-            user_id: userId,
-            points: points,
-            lifetime_points: points,
-            level: this.calculateLevel(points)
-          });
-        
-        if (insertError) {
-          console.error('Error creating points record:', insertError);
-          return { success: false };
-        }
-      }
-      
       // Add transaction to history
       const { error: historyError } = await supabase
         .from('reward_points_history')
@@ -182,7 +143,7 @@ export class RewardsService {
         // Continue anyway, main transaction was successful
       }
       
-      return { success: true, newTotal };
+      return { success: true, newTotal: data };
     } catch (error) {
       console.error('Exception adding points:', error);
       return { success: false };
@@ -203,34 +164,15 @@ export class RewardsService {
         return { success: false };
       }
 
-      // First check if user has enough points
-      const { data: currentData, error: fetchError } = await supabase
-        .from('reward_points')
-        .select('points')
-        .eq('user_id', userId)
-        .maybeSingle();
+      // Call the database function with negative points to subtract
+      const { data, error } = await supabase
+        .rpc('update_user_points', { 
+          user_id_param: userId, 
+          points_to_add: -points 
+        });
       
-      if (fetchError || !currentData) {
-        console.error('Error fetching current points:', fetchError);
-        return { success: false };
-      }
-      
-      if (currentData.points < points) {
-        return { success: false }; // Not enough points
-      }
-      
-      // Update points (subtract)
-      const newTotal = currentData.points - points;
-      const { error: updateError } = await supabase
-        .from('reward_points')
-        .update({ 
-          points: newTotal,
-          updated_at: new Date().toISOString()
-        })
-        .eq('user_id', userId);
-      
-      if (updateError) {
-        console.error('Error redeeming points:', updateError);
+      if (error) {
+        console.error('Error redeeming points:', error);
         return { success: false };
       }
       
@@ -250,7 +192,7 @@ export class RewardsService {
         // Continue anyway, main transaction was successful
       }
       
-      return { success: true, newTotal };
+      return { success: true, newTotal: data };
     } catch (error) {
       console.error('Exception redeeming points:', error);
       return { success: false };
@@ -278,7 +220,7 @@ export class RewardsService {
       }
       
       // Map database records to frontend type
-      return data.map(record => ({
+      return data.map((record: PointsHistory) => ({
         id: record.id,
         type: record.amount > 0 ? 'earned' : 'redeemed',
         points: Math.abs(record.amount),
@@ -288,6 +230,76 @@ export class RewardsService {
     } catch (error) {
       console.error('Exception fetching points history:', error);
       return [];
+    }
+  }
+  
+  /**
+   * Get available rewards from the database
+   */
+  static async getAvailableRewards(): Promise<UserReward[]> {
+    try {
+      const { data, error } = await supabase
+        .from('rewards')
+        .select('*')
+        .eq('is_active', true)
+        .order('points', { ascending: true });
+      
+      if (error) {
+        console.error('Error fetching rewards:', error);
+        return [];
+      }
+      
+      // Map database records to frontend type
+      return data.map((reward: Reward) => ({
+        id: reward.id,
+        name: reward.name,
+        description: reward.description || '',
+        points: reward.points,
+        type: reward.type,
+        imageUrl: reward.image_url || 'https://images.unsplash.com/photo-1565299585323-38d6b0865b47?auto=format&fit=crop&w=800',
+        expiryDate: reward.expiry_date ? reward.expiry_date : '2025-12-31'
+      }));
+    } catch (error) {
+      console.error('Exception fetching rewards:', error);
+      // If there's an error or no rewards yet, return mock data
+      return [
+        {
+          id: '1',
+          name: '10% off next order',
+          description: 'Get 10% off your next order',
+          points: 200,
+          type: 'discount',
+          imageUrl: 'https://images.unsplash.com/photo-1565299585323-38d6b0865b47?auto=format&fit=crop&w=800',
+          expiryDate: '2025-12-31'
+        },
+        {
+          id: '2',
+          name: 'Free dessert',
+          description: 'Enjoy a free dessert with your next meal',
+          points: 350,
+          type: 'freeItem',
+          imageUrl: 'https://images.unsplash.com/photo-1563805042-7684c019e1cb?auto=format&fit=crop&w=800',
+          expiryDate: '2025-12-31'
+        },
+        {
+          id: '3',
+          name: 'Free delivery for a week',
+          description: 'Get free delivery on all orders for a week',
+          points: 500,
+          type: 'delivery',
+          imageUrl: 'https://images.unsplash.com/photo-1526367790999-0150786686a2?auto=format&fit=crop&w=800',
+          expiryDate: '2025-12-31'
+        },
+        {
+          id: '4',
+          name: 'VIP restaurant experience',
+          description: 'Enjoy a special VIP treatment at selected restaurants',
+          points: 1000,
+          type: 'exclusive',
+          imageUrl: 'https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?auto=format&fit=crop&w=800',
+          expiryDate: '2025-12-31'
+        }
+      ];
     }
   }
   
@@ -309,21 +321,6 @@ export class RewardsService {
   static getUserTierByName(level: string): RewardTier {
     const tier = rewardTiers.find(t => t.name === level);
     return tier || rewardTiers[0]; // Default to Bronze if not found
-  }
-  
-  /**
-   * Calculate level name based on lifetime points
-   */
-  static calculateLevel(lifetimePoints: number): string {
-    if (lifetimePoints >= 2500) {
-      return 'platinumTier';
-    } else if (lifetimePoints >= 1000) {
-      return 'goldTier';
-    } else if (lifetimePoints >= 500) {
-      return 'silverTier';
-    } else {
-      return 'bronzeTier';
-    }
   }
   
   /**
@@ -366,48 +363,78 @@ export class RewardsService {
   }
   
   /**
-   * Get available rewards
+   * Seed rewards data to the database (for development/testing)
    */
-  static async getAvailableRewards(): Promise<UserReward[]> {
-    // In a full implementation, this would fetch from a rewards table
-    // For now, returning mock data since there's no rewards table yet
-    return Promise.resolve([
-      {
-        id: '1',
-        name: '10% off next order',
-        description: 'Get 10% off your next order',
-        points: 200,
-        type: 'discount',
-        imageUrl: 'https://images.unsplash.com/photo-1565299585323-38d6b0865b47?auto=format&fit=crop&w=800',
-        expiryDate: '2025-12-31'
-      },
-      {
-        id: '2',
-        name: 'Free dessert',
-        description: 'Enjoy a free dessert with your next meal',
-        points: 350,
-        type: 'freeItem',
-        imageUrl: 'https://images.unsplash.com/photo-1563805042-7684c019e1cb?auto=format&fit=crop&w=800',
-        expiryDate: '2025-12-31'
-      },
-      {
-        id: '3',
-        name: 'Free delivery for a week',
-        description: 'Get free delivery on all orders for a week',
-        points: 500,
-        type: 'delivery',
-        imageUrl: 'https://images.unsplash.com/photo-1526367790999-0150786686a2?auto=format&fit=crop&w=800',
-        expiryDate: '2025-12-31'
-      },
-      {
-        id: '4',
-        name: 'VIP restaurant experience',
-        description: 'Enjoy a special VIP treatment at selected restaurants',
-        points: 1000,
-        type: 'exclusive',
-        imageUrl: 'https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?auto=format&fit=crop&w=800',
-        expiryDate: '2025-12-31'
+  static async seedRewardsData(): Promise<boolean> {
+    try {
+      const { count, error: countError } = await supabase
+        .from('rewards')
+        .select('*', { count: 'exact', head: true });
+      
+      if (countError) {
+        console.error('Error checking rewards count:', countError);
+        return false;
       }
-    ]);
+      
+      // Only seed if there are no rewards yet
+      if (count !== null && count > 0) {
+        console.log('Rewards data already exists, skipping seed');
+        return true;
+      }
+      
+      const seedRewards = [
+        {
+          name: '10% off next order',
+          description: 'Get 10% off your next order',
+          points: 200,
+          type: 'discount',
+          image_url: 'https://images.unsplash.com/photo-1565299585323-38d6b0865b47?auto=format&fit=crop&w=800',
+          expiry_date: '2025-12-31',
+          is_active: true
+        },
+        {
+          name: 'Free dessert',
+          description: 'Enjoy a free dessert with your next meal',
+          points: 350,
+          type: 'freeItem',
+          image_url: 'https://images.unsplash.com/photo-1563805042-7684c019e1cb?auto=format&fit=crop&w=800',
+          expiry_date: '2025-12-31',
+          is_active: true
+        },
+        {
+          name: 'Free delivery for a week',
+          description: 'Get free delivery on all orders for a week',
+          points: 500,
+          type: 'delivery',
+          image_url: 'https://images.unsplash.com/photo-1526367790999-0150786686a2?auto=format&fit=crop&w=800',
+          expiry_date: '2025-12-31',
+          is_active: true
+        },
+        {
+          name: 'VIP restaurant experience',
+          description: 'Enjoy a special VIP treatment at selected restaurants',
+          points: 1000,
+          type: 'exclusive',
+          image_url: 'https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?auto=format&fit=crop&w=800',
+          expiry_date: '2025-12-31',
+          is_active: true
+        }
+      ];
+      
+      const { error: insertError } = await supabase
+        .from('rewards')
+        .insert(seedRewards);
+      
+      if (insertError) {
+        console.error('Error seeding rewards data:', insertError);
+        return false;
+      }
+      
+      console.log('Successfully seeded rewards data');
+      return true;
+    } catch (error) {
+      console.error('Exception seeding rewards data:', error);
+      return false;
+    }
   }
 }

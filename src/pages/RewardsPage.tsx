@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import Header from '@/components/Header';
 import Footer from '@/components/Footer';
@@ -25,6 +26,16 @@ const RewardsPage: React.FC = () => {
   const [pointsHistory, setPointsHistory] = useState<any[]>([]);
   const [availableRewards, setAvailableRewards] = useState<UserReward[]>([]);
   const [isDataLoading, setIsDataLoading] = useState(true);
+
+  // Seed rewards data on initial load (only in development/testing)
+  useEffect(() => {
+    // Only seed if authenticated to avoid unnecessary DB calls
+    if (isAuthenticated && user) {
+      RewardsService.seedRewardsData().catch(error => 
+        console.error('Failed to seed rewards data:', error)
+      );
+    }
+  }, [isAuthenticated, user]);
 
   // Fetch user rewards data
   useEffect(() => {
@@ -208,7 +219,7 @@ const RewardsPage: React.FC = () => {
             
             <TabsContent value="tiers">
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-                {rewardTiers.map((tier, index) => (
+                {rewardTiers.map((tier) => (
                   <TierCard 
                     key={tier.name}
                     tier={tier}

@@ -104,35 +104,18 @@ export interface Category {
   is_active?: boolean;
 }
 
-export interface RewardPoints {
-  id: string;
-  user_id: string;
-  points: number;
-  lifetime_points: number;
-  level: 'bronze' | 'silver' | 'gold' | 'platinum';
-}
-
-export interface Location {
+export interface Reward {
   id: string;
   name: string;
-  type: 'country' | 'city' | 'area';
-  parent_id?: string;
-  delivery_available: boolean;
-  delivery_fee: number;
-}
-
-export interface Notification {
-  id: string;
-  user_id: string;
-  title: string;
-  message: string;
-  notification_type: string;
-  reference_id?: string;
-  is_read: boolean;
+  description: string | null;
+  points: number;
+  type: string;
+  image_url: string | null;
+  expiry_date: string | null;
+  is_active: boolean;
   created_at: string;
 }
 
-// Added interfaces for the rewards system
 export interface UserReward {
   id: string;
   name: string;
@@ -167,4 +150,43 @@ export interface UserPoints {
   nextTier?: RewardTier | null;
   pointsToNextTier?: number;
   progressPercentage?: number;
+}
+
+export interface RewardPoints {
+  id: string;
+  user_id: string;
+  points: number;
+  lifetime_points: number;
+  level: string;
+  updated_at?: string;
+}
+
+export interface PointsHistory {
+  id: string;
+  user_id: string;
+  amount: number;
+  source: string;
+  description: string;
+  reference_id?: string;
+  created_at: string;
+}
+
+export interface Location {
+  id: string;
+  name: string;
+  type: 'country' | 'city' | 'area';
+  parent_id?: string;
+  delivery_available: boolean;
+  delivery_fee: number;
+}
+
+export interface Notification {
+  id: string;
+  user_id: string;
+  title: string;
+  message: string;
+  notification_type: string;
+  reference_id?: string;
+  is_read: boolean;
+  created_at: string;
 }
