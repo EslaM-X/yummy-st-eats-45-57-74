@@ -24,36 +24,30 @@ const AdminPendingContent: React.FC = () => {
   const fetchPendingContent = async () => {
     setIsLoading(true);
     try {
-      // Fetch pending restaurants using direct query
+      // Fetch pending restaurants
       const { data: restaurants, error: restaurantsError } = await supabase
-        .rpc('get_pending_restaurants');
+        .from('pending_restaurants')
+        .select('*')
+        .eq('status', 'pending')
+        .order('created_at', { ascending: false });
 
       if (restaurantsError) {
         console.error('Error fetching restaurants:', restaurantsError);
-        // Fallback to direct table query
-        const { data: fallbackRestaurants } = await supabase
-          .from('pending_restaurants')
-          .select('*')
-          .eq('status', 'pending')
-          .order('created_at', { ascending: false });
-        setPendingRestaurants(fallbackRestaurants as PendingRestaurant[] || []);
+        setPendingRestaurants([]);
       } else {
         setPendingRestaurants(restaurants as PendingRestaurant[] || []);
       }
 
-      // Fetch pending foods using direct query
+      // Fetch pending foods
       const { data: foods, error: foodsError } = await supabase
-        .rpc('get_pending_foods');
+        .from('pending_foods')
+        .select('*')
+        .eq('status', 'pending')
+        .order('created_at', { ascending: false });
 
       if (foodsError) {
         console.error('Error fetching foods:', foodsError);
-        // Fallback to direct table query
-        const { data: fallbackFoods } = await supabase
-          .from('pending_foods')
-          .select('*')
-          .eq('status', 'pending')
-          .order('created_at', { ascending: false });
-        setPendingFoods(fallbackFoods as PendingFood[] || []);
+        setPendingFoods([]);
       } else {
         setPendingFoods(foods as PendingFood[] || []);
       }
@@ -78,27 +72,15 @@ const AdminPendingContent: React.FC = () => {
     try {
       // Update pending restaurant status
       const { error: updateError } = await supabase
-        .rpc('update_pending_restaurant_status', {
-          restaurant_id: restaurantId,
-          new_status: action,
-          notes: notes
-        });
+        .from('pending_restaurants')
+        .update({
+          status: action,
+          admin_notes: notes,
+          reviewed_at: new Date().toISOString()
+        })
+        .eq('id', restaurantId);
 
-      if (updateError) {
-        console.error('Error using RPC, trying direct update:', updateError);
-        
-        // Fallback to direct update
-        const { error: directError } = await supabase
-          .from('pending_restaurants')
-          .update({
-            status: action,
-            admin_notes: notes,
-            reviewed_at: new Date().toISOString()
-          })
-          .eq('id', restaurantId);
-
-        if (directError) throw directError;
-      }
+      if (updateError) throw updateError;
 
       // If approved, copy to main restaurants table
       if (action === 'approved') {
@@ -148,27 +130,15 @@ const AdminPendingContent: React.FC = () => {
     try {
       // Update pending food status
       const { error: updateError } = await supabase
-        .rpc('update_pending_food_status', {
-          food_id: foodId,
-          new_status: action,
-          notes: notes
-        });
+        .from('pending_foods')
+        .update({
+          status: action,
+          admin_notes: notes,
+          reviewed_at: new Date().toISOString()
+        })
+        .eq('id', foodId);
 
-      if (updateError) {
-        console.error('Error using RPC, trying direct update:', updateError);
-        
-        // Fallback to direct update
-        const { error: directError } = await supabase
-          .from('pending_foods')
-          .update({
-            status: action,
-            admin_notes: notes,
-            reviewed_at: new Date().toISOString()
-          })
-          .eq('id', foodId);
-
-        if (directError) throw directError;
-      }
+      if (updateError) throw updateError;
 
       // If approved, copy to main products table
       if (action === 'approved') {

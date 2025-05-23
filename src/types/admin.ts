@@ -60,12 +60,32 @@ export interface PendingFood {
   updated_at: string;
 }
 
-// تعريفات إعدادات الإدارة
+// تعريفات إعدادات الإدارة المُحدثة
 export interface AdminSettings {
-  id: string;
-  setting_key: string;
-  setting_value: string;
-  description?: string;
-  updated_by?: string;
-  updated_at: string;
+  general: {
+    appName: string;
+    adminEmail: string;
+    supportPhone: string;
+    maxDistance: number;
+    defaultLanguage: 'ar' | 'en';
+  };
+  notifications: {
+    emailNotifications: boolean;
+    pushNotifications: boolean;
+    smsNotifications: boolean;
+    orderUpdates: boolean;
+    marketingEmails: boolean;
+  };
+  payment: {
+    acceptCreditCards: boolean;
+    acceptCashOnDelivery: boolean;
+    acceptWallet: boolean;
+    commissionRate: number;
+    vatRate: number;
+  };
+  security: {
+    twoFactorAuth: boolean;
+    requireStrongPasswords: boolean;
+    sessionTimeout: number;
+  };
 }
