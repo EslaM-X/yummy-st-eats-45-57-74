@@ -9,33 +9,119 @@ import TierCard from '@/components/rewards/TierCard';
 import { useToast } from "@/hooks/use-toast";
 import { UserReward } from '@/types';
 import { useAuth } from '@/contexts/AuthContext';
-import { 
-  mockUserPoints, 
-  availableRewards, 
-  pointsHistory, 
-  rewardTiers,
-  calculateRewardsProgress
-} from '@/mocks/rewardsData';
+import { rewardTiers } from '@/mocks/rewardsData';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { Separator } from '@/components/ui/separator';
 import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert';
 import { AlertCircle } from 'lucide-react';
+import { RewardsService } from '@/services/RewardsService';
 
 const RewardsPage: React.FC = () => {
   const { user, isAuthenticated, isLoading } = useAuth();
   const { toast } = useToast();
   const { t } = useLanguage();
   const [activeTab, setActiveTab] = useState<string>("rewards");
+  const [userPoints, setUserPoints] = useState<any>(null);
+  const [pointsHistory, setPointsHistory] = useState<any[]>([]);
+  const [availableRewards, setAvailableRewards] = useState<UserReward[]>([]);
+  const [isDataLoading, setIsDataLoading] = useState(true);
 
-  const userPoints = mockUserPoints;
-  const { nextTier, pointsToNextTier, progressPercentage } = calculateRewardsProgress(userPoints.total);
+  // Fetch user rewards data
+  useEffect(() => {
+    if (isLoading) return; // Wait until auth is loaded
+    
+    if (!isAuthenticated || !user) return; // Only fetch if authenticated
+    
+    const fetchRewardsData = async () => {
+      setIsDataLoading(true);
+      try {
+        // Fetch user points
+        const points = await RewardsService.getUserPoints(user.id);
+        if (points) {
+          setUserPoints(points);
+          
+          // Calculate progress
+          const progress = RewardsService.calculateProgress(points.total);
+          points.nextTier = progress.nextTier;
+          points.pointsToNextTier = progress.pointsToNextTier;
+          points.progressPercentage = progress.progressPercentage;
+        }
+        
+        // Fetch points history
+        const history = await RewardsService.getPointsHistory(user.id);
+        setPointsHistory(history);
+        
+        // Fetch available rewards
+        const rewards = await RewardsService.getAvailableRewards();
+        setAvailableRewards(rewards);
+      } catch (error) {
+        console.error('Error fetching rewards data:', error);
+        toast({
+          title: t('errorOccurred'),
+          description: t('errorFetchingData'),
+          variant: "destructive",
+        });
+      } finally {
+        setIsDataLoading(false);
+      }
+    };
+    
+    fetchRewardsData();
+  }, [isAuthenticated, isLoading, user, t, toast]);
 
-  const handleRedeemReward = (reward: UserReward) => {
-    toast({
-      title: t('rewardRedeemed'),
-      description: `${reward.name} - ${reward.points} ${t('pointsUnit')}`,
-    });
+  // Handle reward redemption
+  const handleRedeemReward = async (reward: UserReward) => {
+    if (!user) return;
+    
+    try {
+      const result = await RewardsService.redeemPoints(
+        user.id, 
+        reward.points, 
+        reward.id, 
+        reward.name
+      );
+      
+      if (result.success) {
+        // Update local state with new points total
+        if (userPoints && result.newTotal !== undefined) {
+          const updatedPoints = { 
+            ...userPoints, 
+            total: result.newTotal 
+          };
+          
+          // Recalculate progress
+          const progress = RewardsService.calculateProgress(result.newTotal);
+          updatedPoints.nextTier = progress.nextTier;
+          updatedPoints.pointsToNextTier = progress.pointsToNextTier;
+          updatedPoints.progressPercentage = progress.progressPercentage;
+          
+          setUserPoints(updatedPoints);
+        }
+        
+        // Refresh points history
+        const history = await RewardsService.getPointsHistory(user.id);
+        setPointsHistory(history);
+        
+        toast({
+          title: t('rewardRedeemed'),
+          description: `${reward.name} - ${reward.points} ${t('pointsUnit')}`,
+        });
+      } else {
+        toast({
+          title: t('redemptionFailed'),
+          description: t('notEnoughPoints'),
+          variant: "destructive",
+        });
+      }
+    } catch (error) {
+      console.error('Error redeeming reward:', error);
+      toast({
+        title: t('errorOccurred'),
+        description: t('errorRedeemingReward'),
+        variant: "destructive",
+      });
+    }
   };
 
   if (isLoading) {
@@ -78,12 +164,26 @@ const RewardsPage: React.FC = () => {
           </h1>
 
           <div className="mb-10">
-            <UserPointsCard 
-              userPoints={userPoints}
-              nextTier={nextTier}
-              progressPercentage={progressPercentage}
-              pointsToNextTier={pointsToNextTier}
-            />
+            {isDataLoading ? (
+              <div className="flex justify-center p-10">
+                <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-primary"></div>
+              </div>
+            ) : userPoints ? (
+              <UserPointsCard 
+                userPoints={userPoints}
+                nextTier={userPoints.nextTier}
+                progressPercentage={userPoints.progressPercentage}
+                pointsToNextTier={userPoints.pointsToNextTier}
+              />
+            ) : (
+              <Alert>
+                <AlertCircle className="h-4 w-4" />
+                <AlertTitle>{t('noRewardsFound')}</AlertTitle>
+                <AlertDescription>
+                  {t('errorLoadingRewards')}
+                </AlertDescription>
+              </Alert>
+            )}
           </div>
 
           <Tabs defaultValue={activeTab} onValueChange={setActiveTab} className="mb-10">
@@ -100,11 +200,17 @@ const RewardsPage: React.FC = () => {
             </TabsList>
             
             <TabsContent value="rewards" className="p-1">
-              <AvailableRewards 
-                rewards={availableRewards} 
-                userPoints={userPoints.total} 
-                onRedeemReward={handleRedeemReward}
-              />
+              {isDataLoading ? (
+                <div className="flex justify-center p-10">
+                  <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-primary"></div>
+                </div>
+              ) : (
+                <AvailableRewards 
+                  rewards={availableRewards} 
+                  userPoints={userPoints?.total || 0} 
+                  onRedeemReward={handleRedeemReward}
+                />
+              )}
             </TabsContent>
             
             <TabsContent value="tiers">
@@ -113,14 +219,20 @@ const RewardsPage: React.FC = () => {
                   <TierCard 
                     key={tier.name}
                     tier={tier}
-                    isCurrentTier={userPoints.tier.name === tier.name}
+                    isCurrentTier={userPoints?.tier?.name === tier.name}
                   />
                 ))}
               </div>
             </TabsContent>
             
             <TabsContent value="history">
-              <PointsHistoryList transactions={pointsHistory} />
+              {isDataLoading ? (
+                <div className="flex justify-center p-10">
+                  <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-primary"></div>
+                </div>
+              ) : (
+                <PointsHistoryList transactions={pointsHistory} />
+              )}
             </TabsContent>
           </Tabs>
 
