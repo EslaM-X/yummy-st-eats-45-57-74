@@ -10,11 +10,9 @@ import enCart from '@/locales/en/cart.json';
 import enPayment from '@/locales/en/payment.json';
 import enRefund from '@/locales/en/refund.json';
 import enRestaurants from '@/locales/en/restaurants.json';
-import enRewards from '@/locales/en/rewards.json';
 import enAddFood from '@/locales/en/add-food.json';
 import enRegisterRestaurant from '@/locales/en/register-restaurant.json';
 import enFooter from '@/locales/en/footer.json';
-import enTeam from '@/locales/en/team.json';
 
 // Import Arabic translations
 import arCommon from '@/locales/ar/common.json';
@@ -25,11 +23,9 @@ import arCart from '@/locales/ar/cart.json';
 import arPayment from '@/locales/ar/payment.json';
 import arRefund from '@/locales/ar/refund.json';
 import arRestaurants from '@/locales/ar/restaurants.json';
-import arRewards from '@/locales/ar/rewards.json';
 import arAddFood from '@/locales/ar/add-food.json';
 import arRegisterRestaurant from '@/locales/ar/register-restaurant.json';
 import arFooter from '@/locales/ar/footer.json';
-import arTeam from '@/locales/ar/team.json';
 
 type Language = 'ar' | 'en';
 
@@ -51,11 +47,9 @@ const enTranslations = {
   ...enPayment,
   ...enRefund,
   ...enRestaurants,
-  ...enRewards,
   ...enAddFood,
   ...enRegisterRestaurant,
-  ...enFooter,
-  ...enTeam
+  ...enFooter
 };
 
 // Merge all Arabic translations
@@ -68,11 +62,9 @@ const arTranslations = {
   ...arPayment,
   ...arRefund,
   ...arRestaurants,
-  ...arRewards,
   ...arAddFood,
   ...arRegisterRestaurant,
-  ...arFooter,
-  ...arTeam
+  ...arFooter
 };
 
 // Combine translations for all languages
