@@ -1,3 +1,4 @@
+
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 
@@ -19,7 +20,16 @@ export const authService = {
         }
       });
       
-      if (error) throw error;
+      if (error) {
+        // Check if error is related to existing user
+        if (error.message.includes('User already registered')) {
+          return { 
+            data: null, 
+            error: new Error('البريد الإلكتروني مستخدم بالفعل. يرجى استخدام بريد إلكتروني آخر أو تسجيل الدخول.') 
+          };
+        }
+        throw error;
+      }
       
       // Note: We don't need to manually create a profile here
       // The database trigger will handle this automatically
@@ -86,6 +96,22 @@ export const authService = {
   // Get current session
   getSession() {
     return supabase.auth.getSession();
+  },
+  
+  // Check if username exists
+  async checkUsernameExists(username: string) {
+    try {
+      const { data, error, count } = await supabase
+        .from('profiles')
+        .select('username', { count: 'exact' })
+        .eq('username', username)
+        .limit(1);
+      
+      return { exists: (count || 0) > 0, error };
+    } catch (error) {
+      console.error('Exception checking username:', error);
+      return { exists: false, error };
+    }
   }
 };
 

@@ -12,19 +12,23 @@ import { useAuth } from '@/contexts/AuthContext';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { sanitizeMetadata } from './AuthUtils';
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { AlertCircle, Check, RefreshCw } from "lucide-react";
+import { AlertCircle, Check, Eye, EyeOff, RefreshCw } from "lucide-react";
 import { resendConfirmationEmail } from '@/services/authService';
 
-// Register form schema
+// Register form schema with password confirmation
 const registerSchema = z.object({
   email: z.string().email("يجب إدخال بريد إلكتروني صالح"),
   password: z.string().min(6, "كلمة المرور يجب أن تكون 6 أحرف على الأقل"),
+  confirmPassword: z.string().min(1, "يجب تأكيد كلمة المرور"),
   fullName: z.string().min(2, "يجب إدخال الاسم الكامل"),
   username: z.string().min(3, "اسم المستخدم يجب أن يكون 3 أحرف على الأقل")
     .max(20, "اسم المستخدم يجب ألا يتجاوز 20 حرفاً")
     .regex(/^[a-zA-Z0-9_]+$/, "اسم المستخدم يجب أن يحتوي على أحرف وأرقام وشرطات سفلية فقط"),
   phone: z.string().optional(),
   userType: z.enum(["customer", "restaurant_owner"])
+}).refine((data) => data.password === data.confirmPassword, {
+  message: "كلمات المرور غير متطابقة",
+  path: ["confirmPassword"],
 });
 
 interface RegisterFormProps {
@@ -36,6 +40,9 @@ const RegisterForm: React.FC<RegisterFormProps> = ({ onSuccess }) => {
   const [registrationSuccess, setRegistrationSuccess] = useState<boolean>(false);
   const [registeredEmail, setRegisteredEmail] = useState<string>("");
   const [resendingEmail, setResendingEmail] = useState<boolean>(false);
+  const [showPassword, setShowPassword] = useState<boolean>(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState<boolean>(false);
+  const [duplicateError, setDuplicateError] = useState<{ type: string, message: string } | null>(null);
   const { toast } = useToast();
   const { language } = useLanguage();
   const { signUp } = useAuth();
@@ -45,6 +52,7 @@ const RegisterForm: React.FC<RegisterFormProps> = ({ onSuccess }) => {
     defaultValues: {
       email: "",
       password: "",
+      confirmPassword: "",
       fullName: "",
       username: "",
       phone: "",
@@ -55,6 +63,8 @@ const RegisterForm: React.FC<RegisterFormProps> = ({ onSuccess }) => {
   // معالجة تسجيل حساب جديد
   const handleRegister = async (values: z.infer<typeof registerSchema>) => {
     setLoading(true);
+    setDuplicateError(null);
+    
     try {
       // تجهيز البيانات الوصفية مع معالجة الأحرف غير المتوافقة
       const metadata = sanitizeMetadata({
@@ -70,9 +80,25 @@ const RegisterForm: React.FC<RegisterFormProps> = ({ onSuccess }) => {
       if (error) {
         console.error('Signup error:', error);
         
-        // Check for duplicate profile error
-        if (error.message && error.message.includes('duplicate key')) {
+        // التحقق من نوع الخطأ وتقديم رسائل مخصصة للمستخدم
+        const errorMessage = error.message || "";
+        
+        // التحقق من تكرار البريد الإلكتروني
+        if (errorMessage.includes('email') && errorMessage.includes('already')) {
+          setDuplicateError({
+            type: 'email',
+            message: 'البريد الإلكتروني مستخدم بالفعل. يرجى استخدام بريد إلكتروني آخر أو تسجيل الدخول.'
+          });
           throw new Error('البريد الإلكتروني مستخدم بالفعل. يرجى استخدام بريد إلكتروني آخر أو تسجيل الدخول.');
+        }
+        
+        // التحقق من تكرار اسم المستخدم (من خلال خطأ قيود قاعدة البيانات الفريدة)
+        if (errorMessage.includes('duplicate key') && errorMessage.includes('username')) {
+          setDuplicateError({
+            type: 'username',
+            message: 'اسم المستخدم مستخدم بالفعل. يرجى اختيار اسم مستخدم آخر.'
+          });
+          throw new Error('اسم المستخدم مستخدم بالفعل. يرجى اختيار اسم مستخدم آخر.');
         }
         
         throw error;
@@ -153,6 +179,20 @@ const RegisterForm: React.FC<RegisterFormProps> = ({ onSuccess }) => {
         </Alert>
       )}
       
+      {duplicateError && (
+        <Alert className="mb-6 bg-red-50 dark:bg-red-950 border-red-200 dark:border-red-800">
+          <AlertCircle className="h-4 w-4 text-red-600 dark:text-red-400" />
+          <AlertTitle className="text-red-600 dark:text-red-400">
+            {duplicateError.type === 'email' 
+              ? (language === 'ar' ? 'البريد الإلكتروني مستخدم بالفعل' : 'Email already in use')
+              : (language === 'ar' ? 'اسم المستخدم مستخدم بالفعل' : 'Username already taken')}
+          </AlertTitle>
+          <AlertDescription className="text-red-600 dark:text-red-400">
+            {duplicateError.message}
+          </AlertDescription>
+        </Alert>
+      )}
+      
       <form onSubmit={form.handleSubmit(handleRegister)} className="space-y-4">
         <FormField
           control={form.control}
@@ -184,12 +224,55 @@ const RegisterForm: React.FC<RegisterFormProps> = ({ onSuccess }) => {
                 {language === 'ar' ? 'كلمة المرور' : 'Password'}
               </FormLabel>
               <FormControl>
-                <Input 
-                  placeholder={language === 'ar' ? 'أدخل كلمة المرور' : 'Enter your password'} 
-                  type="password" 
-                  className="text-black dark:text-white"
-                  {...field} 
-                />
+                <div className="relative">
+                  <Input 
+                    placeholder={language === 'ar' ? 'أدخل كلمة المرور' : 'Enter your password'} 
+                    type={showPassword ? "text" : "password"} 
+                    className="text-black dark:text-white pr-10"
+                    {...field} 
+                  />
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    className="absolute right-0 top-0 h-full px-3"
+                    onClick={() => setShowPassword(!showPassword)}
+                  >
+                    {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                  </Button>
+                </div>
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+        
+        <FormField
+          control={form.control}
+          name="confirmPassword"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>
+                {language === 'ar' ? 'تأكيد كلمة المرور' : 'Confirm Password'}
+              </FormLabel>
+              <FormControl>
+                <div className="relative">
+                  <Input 
+                    placeholder={language === 'ar' ? 'أعد إدخال كلمة المرور' : 'Re-enter your password'} 
+                    type={showConfirmPassword ? "text" : "password"} 
+                    className="text-black dark:text-white pr-10"
+                    {...field} 
+                  />
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    className="absolute right-0 top-0 h-full px-3"
+                    onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                  >
+                    {showConfirmPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                  </Button>
+                </div>
               </FormControl>
               <FormMessage />
             </FormItem>
