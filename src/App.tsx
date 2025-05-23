@@ -12,8 +12,7 @@ import ProductsPage from './pages/ProductsPage';
 import CartPage from './pages/CartPage';
 import CheckoutPage from './pages/CheckoutPage';
 import RegisterRestaurantPage from './pages/RegisterRestaurantPage';
-import CoreTeamPage from './pages/CoreTeamPage';
-import RewardsPage from './pages/RewardsPage';
+import CouponsPage from './pages/CouponsPage'; // تم استبدال RewardsPage بـ CouponsPage
 import ProfilePage from './pages/ProfilePage';
 import AuthPage from './pages/AuthPage';
 import ResetPasswordPage from './pages/ResetPasswordPage';
@@ -84,36 +83,30 @@ function App() {
           path="/profile" 
           element={user ? <ProfilePage /> : <Navigate to="/auth" />} 
         />
+        <Route path="/coupons" element={<CouponsPage />} /> {/* تم استبدال /rewards بـ /coupons */}
+        {/* إعادة توجيه المكافآت إلى الكوبونات للحفاظ على الروابط القديمة */}
+        <Route path="/rewards" element={<Navigate to="/coupons" replace />} />
+        <Route path="/auth" element={<AuthPage />} />
+        <Route path="/reset-password" element={<ResetPasswordPage />} />
+        <Route path="/admin-login" element={<AdminLoginPage />} />
+        <Route path="/admin" element={<AdminPage />} />
+        <Route path="/add-food" element={<AddFoodPage />} />
+        <Route path="/privacy-policy" element={<PrivacyPolicyPage />} />
+        <Route path="/terms-conditions" element={<TermsConditionsPage />} />
+        <Route path="/cookie-policy" element={<CookiePolicyPage />} />
         <Route 
           path="/my-orders" 
           element={user ? <MyOrdersPage /> : <Navigate to="/auth" />} 
         />
         <Route 
+          path="/order/:orderId" 
+          element={user ? <OrderDetailsPage /> : <Navigate to="/auth" />} 
+        />
+        <Route 
           path="/orders" 
           element={user ? <OrdersPage /> : <Navigate to="/auth" />} 
         />
-        <Route 
-          path="/my-orders/:orderId" 
-          element={user ? <OrderDetailsPage /> : <Navigate to="/auth" />} 
-        />
-        <Route path="/team" element={<CoreTeamPage />} />
-        <Route path="/rewards" element={<RewardsPage />} />
-        <Route 
-          path="/add-food" 
-          element={user ? <AddFoodPage /> : <Navigate to="/auth" />} 
-        />
-        <Route path="/auth" element={<AuthPage />} />
-        <Route path="/login" element={<AuthPage />} /> {/* إضافة مسار جديد للتوجيه إلى صفحة تسجيل الدخول */}
-        <Route path="/reset-password" element={<ResetPasswordPage />} />
-        <Route path="/admin-login" element={<AdminLoginPage />} />
-        <Route path="/admin/*" element={<AdminPage />} />
-        
-        {/* صفحات السياسات */}
-        <Route path="/privacy-policy" element={<PrivacyPolicyPage />} />
-        <Route path="/terms-conditions" element={<TermsConditionsPage />} />
-        <Route path="/cookie-policy" element={<CookiePolicyPage />} />
-        
-        {/* صفحة غير موجودة */}
+        {/* تم حذف مسار /team */}
         <Route path="*" element={<NotFound />} />
       </Routes>
       

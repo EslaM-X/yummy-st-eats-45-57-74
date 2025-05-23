@@ -1,212 +1,227 @@
-
-import React from 'react';
-import { zodResolver } from "@hookform/resolvers/zod";
-import { useForm, FormProvider } from "react-hook-form";
-import * as z from "zod";
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { toast } from 'sonner';
+import { useToast } from "@/hooks/use-toast";
+import { Label } from "@/components/ui/label";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { Button } from "@/components/ui/button";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { useAuth } from '@/contexts/AuthContext';
+import { supabase } from '@/integrations/supabase/client';
 import Header from '@/components/Header';
 import Footer from '@/components/Footer';
-import { Utensils, ChevronLeft } from "lucide-react";
-import { Form } from "@/components/ui/form";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
-import { useLanguage } from '@/contexts/LanguageContext';
 
-// Import new components
-import FoodFormFields from '@/components/add-food/FoodFormFields';
-import ImageUploadArea from '@/components/add-food/ImageUploadArea';
-import SideInfoPanel from '@/components/add-food/SideInfoPanel';
-
-// تعريف نموذج التحقق باستخدام Zod
-const foodFormSchema = z.object({
-  name: z.string().min(3, {
-    message: "يجب أن يكون اسم الطبق 3 أحرف على الأقل",
-  }),
-  description: z.string().min(10, {
-    message: "يجب أن يكون الوصف 10 أحرف على الأقل",
-  }),
-  category: z.string({
-    required_error: "يرجى اختيار تصنيف",
-  }),
-  price: z.string().min(1, {
-    message: "يرجى إدخال السعر",
-  }),
-  preparationTime: z.string().min(1, {
-    message: "يرجى إدخال وقت التحضير",
-  }),
-  ingredients: z.string().min(5, {
-    message: "يرجى إدخال المكونات (5 أحرف على الأقل)",
-  }),
-  country: z.string({
-    required_error: "يرجى اختيار الدولة",
-  }),
-});
-
-// أنواع الطعام - تبقى كما هي
-const foodCategories = [
-  { value: "main", label: "أطباق رئيسية" },
-  { value: "appetizer", label: "مقبلات" },
-  { value: "dessert", label: "حلويات" },
-  { value: "drink", label: "مشروبات" },
-  { value: "side", label: "أطباق جانبية" },
-  { value: "breakfast", label: "إفطار" },
-  { value: "healthy", label: "أطعمة صحية" },
-  { value: "fast-food", label: "وجبات سريعة" },
-];
-
-// صور توضيحية للمطبخ المنزلي - تم تحديث عنوان URL للصورة الرابعة
-const kitchenGalleryImages = [
-  "https://images.unsplash.com/photo-1606787366850-de6330128bfc?w=500&auto=format",
-  "https://images.unsplash.com/photo-1556910103-1c02745aae4d?w=500&auto=format",
-  "https://images.unsplash.com/photo-1556911261-6bd341186b2f?w=500&auto=format",
-  "https://images.unsplash.com/photo-1590675396922-40db3af5a378?w=500&auto=format&fit=crop",
-  "https://images.unsplash.com/photo-1605522469906-3fe226b356bc?w=500&auto=format",
-  "https://images.unsplash.com/photo-1495521821757-a1efb6729352?w=500&auto=format",
-];
-
-// قصص نجاح - تبقى كما هي
-const successStories = [
-  {
-    name: "سارة الأحمد",
-    specialty: "الحلويات الشرقية",
-    story: "بدأت بمشاركة كنافة منزلية، والآن لدي متجر صغير للحلويات الشرقية بفضل التقييمات الإيجابية!",
-    image: "https://images.unsplash.com/photo-1512485694207-bde7c9357293?w=150&auto=format"
-  },
-  {
-    name: "محمد العلي",
-    specialty: "المأكولات البحرية",
-    story: "طبق السمك المشوي الخاص بي أصبح مشهوراً في المنطقة بعد مشاركته على المنصة.",
-    image: "https://images.unsplash.com/photo-1566753323558-f4e0952af115?w=150&auto=format"
-  },
-  {
-    name: "فاطمة الزهراني",
-    specialty: "المعجنات",
-    story: "من مطبخي المنزلي إلى مورّد معتمد للمقاهي المحلية. شكراً ST Eat!",
-    image: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format"
-  }
-];
+interface FormData {
+  name: string;
+  description: string;
+  price: string;
+  category: string;
+  imageUrl: string;
+  restaurantId: string;
+}
 
 const AddFoodPage: React.FC = () => {
   const navigate = useNavigate();
-  const { t, language } = useLanguage();
-  const [selectedImage, setSelectedImage] = React.useState<File | null>(null);
-  const [imagePreview, setImagePreview] = React.useState<string | null>(null);
-
-  // TODO: For Zod error messages, a more advanced setup using `setErrorMap` globally
-  // or passing a custom errorMap to zodResolver is needed for full i18n.
-  // For now, Zod messages will remain in their original language from the schema.
-  const methods = useForm<z.infer<typeof foodFormSchema>>({ 
-    resolver: zodResolver(foodFormSchema),
-    defaultValues: {
-      name: "",
-      description: "",
-      category: "",
-      price: "",
-      preparationTime: "",
-      ingredients: "",
-      country: "sa", // Default to Saudi Arabia
-    },
+  const { user } = useAuth();
+  const { toast } = useToast();
+  const [formData, setFormData] = useState<FormData>({
+    name: '',
+    description: '',
+    price: '',
+    category: '',
+    imageUrl: '',
+    restaurantId: ''
   });
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [restaurants, setRestaurants] = useState<{ id: string; name: string; }[]>([]);
 
-  const foodCategories = React.useMemo(() => [
-    { value: "main", label: t('foodCategoryMain') },
-    { value: "appetizer", label: t('foodCategoryAppetizer') },
-    { value: "dessert", label: t('foodCategoryDessert') },
-    { value: "drink", label: t('foodCategoryDrink') },
-    { value: "side", label: t('foodCategorySide') },
-    { value: "breakfast", label: t('foodCategoryBreakfast') },
-    { value: "healthy", label: t('foodCategoryHealthy') },
-    { value: "fast-food", label: t('foodCategoryFastFood') },
-  ], [t]);
+  useEffect(() => {
+    const fetchRestaurants = async () => {
+      try {
+        const { data, error } = await supabase
+          .from('restaurants')
+          .select('id, name');
 
-  function onSubmit(data: z.infer<typeof foodFormSchema>) {
-    console.log("Form data:", data);
-    console.log("Selected image:", selectedImage);
-    toast.success("تم إضافة الطبق بنجاح! سيتم مراجعته قريباً.");
-    setTimeout(() => {
-      navigate('/rewards');
-    }, 1500);
-  }
+        if (error) {
+          console.error('Error fetching restaurants:', error);
+          toast({
+            title: "خطأ",
+            description: "فشل في تحميل المطاعم",
+            variant: "destructive",
+          });
+          return;
+        }
 
-  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files[0]) {
-      const file = e.target.files[0];
-      setSelectedImage(file);
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setImagePreview(reader.result as string);
-      };
-      reader.readAsDataURL(file);
+        setRestaurants(data || []);
+      } catch (error) {
+        console.error('Error fetching restaurants:', error);
+        toast({
+          title: "خطأ",
+          description: "فشل في تحميل المطاعم",
+          variant: "destructive",
+        });
+      }
+    };
+
+    fetchRestaurants();
+  }, []);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    if (!user) {
+      toast({
+        title: "خطأ",
+        description: "يجب تسجيل الدخول أولاً",
+        variant: "destructive",
+      });
+      return;
     }
-  };
 
-  const handleDeleteImage = () => {
-    setSelectedImage(null);
-    setImagePreview(null);
-    const fileInput = document.getElementById('dropzone-file') as HTMLInputElement;
-    if (fileInput) {
-      fileInput.value = "";
+    setIsSubmitting(true);
+
+    try {
+      if (!formData.name || !formData.price || !formData.category) {
+        toast({
+          title: "خطأ",
+          description: "الرجاء ملء جميع الحقول المطلوبة",
+          variant: "destructive",
+        });
+        setIsSubmitting(false);
+        return;
+      }
+
+      if (isNaN(parseFloat(formData.price))) {
+        toast({
+          title: "خطأ",
+          description: "السعر يجب أن يكون رقمًا",
+          variant: "destructive",
+        });
+        setIsSubmitting(false);
+        return;
+      }
+
+      // Submit to pending_foods table instead of direct approval
+      const { error } = await supabase
+        .from('pending_foods')
+        .insert({
+          name: formData.name,
+          description: formData.description,
+          price: parseFloat(formData.price),
+          category: formData.category,
+          image_url: formData.imageUrl || null,
+          restaurant_id: formData.restaurantId || null,
+          owner_id: user.id,
+          status: 'pending' // Will be reviewed by admin
+        });
+
+      if (error) throw error;
+
+      toast({
+        title: "تم إرسال طلبك بنجاح!",
+        description: "سيتم مراجعة طلب إضافة الطعام من قبل الإدارة قريباً",
+      });
+
+      // Reset form
+      setFormData({
+        name: '',
+        description: '',
+        price: '',
+        category: '',
+        imageUrl: '',
+        restaurantId: ''
+      });
+
+      // Redirect to coupons page instead of rewards
+      setTimeout(() => {
+        navigate('/coupons');
+      }, 2000);
+
+    } catch (error: any) {
+      console.error('Error adding food:', error);
+      toast({
+        title: "فشل في إضافة الطعام",
+        description: error.message || "حدث خطأ أثناء إضافة الطعام",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
   return (
-    <div className="flex flex-col min-h-screen bg-gradient-to-b from-white to-gray-50 dark:from-gray-900 dark:to-gray-950">
+    <div className="flex flex-col min-h-screen">
       <Header />
-      <main className="flex-grow py-10">
-        <div className="container mx-auto px-4">
-          <div className="text-center mb-12">
-            <Button 
-              variant="ghost" 
-              className="mb-4" 
-              onClick={() => navigate(-1)}
-            >
-              <ChevronLeft className="h-4 w-4 ml-1 rtl:mr-1 rtl:ml-0" />
-              {t('backButton')}
-            </Button>
-            <h1 className="text-4xl font-bold text-gray-800 dark:text-white mb-4 relative inline-block">
-              <span className="relative z-10">{t('addFoodPageTitle')}</span>
-              <span className="absolute bottom-1 left-0 w-full h-3 bg-yellow-300/30 dark:bg-yellow-800/30 -z-0 transform -rotate-1"></span>
-            </h1>
-            <p className="text-lg text-gray-600 dark:text-gray-300 max-w-2xl mx-auto">
-              {t('addFoodPageSubtitle')}
-            </p>
-          </div>
-
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 mb-16">
-            <div className="lg:col-span-2 order-2 lg:order-1">
-              <Card className="shadow-md">
-                <CardContent className="pt-6">
-                  <FormProvider {...methods}>
-                    <Form {...methods}>
-                      <form onSubmit={methods.handleSubmit(onSubmit)} className="space-y-6">
-                        <FoodFormFields foodCategories={foodCategories} />
-                        <ImageUploadArea 
-                          imagePreview={imagePreview}
-                          handleImageChange={handleImageChange}
-                          onDeleteImage={handleDeleteImage}
-                        />
-                        <Button 
-                          type="submit" 
-                          className="w-full bg-gradient-to-r from-yellow-500 to-amber-600 hover:from-yellow-600 hover:to-amber-700 py-6 text-lg shadow-md hover:shadow-lg transform transition-all hover:-translate-y-0.5 duration-200"
-                        >
-                          <Utensils className="mr-2 rtl:ml-2 rtl:mr-0 h-5 w-5" />
-                          {t('addDishButton')}
-                        </Button>
-                      </form>
-                    </Form>
-                  </FormProvider>
-                </CardContent>
-              </Card>
-            </div>
-
-            <div className="lg:col-span-1 order-1 lg:order-2">
-              <SideInfoPanel 
-                successStories={successStories}
-                kitchenGalleryImages={kitchenGalleryImages}
+      <main className="container mx-auto px-4 py-8 flex-grow">
+        <div className="max-w-3xl mx-auto">
+          <h1 className="text-3xl font-semibold mb-6">إضافة طعام جديد</h1>
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <div>
+              <Label htmlFor="name">اسم الطعام</Label>
+              <Input
+                type="text"
+                id="name"
+                value={formData.name}
+                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                required
               />
             </div>
-          </div>
+            <div>
+              <Label htmlFor="description">الوصف</Label>
+              <Textarea
+                id="description"
+                value={formData.description}
+                onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+              />
+            </div>
+            <div>
+              <Label htmlFor="price">السعر</Label>
+              <Input
+                type="number"
+                id="price"
+                value={formData.price}
+                onChange={(e) => setFormData({ ...formData, price: e.target.value })}
+                required
+              />
+            </div>
+            <div>
+              <Label htmlFor="category">الفئة</Label>
+              <Input
+                type="text"
+                id="category"
+                value={formData.category}
+                onChange={(e) => setFormData({ ...formData, category: e.target.value })}
+                required
+              />
+            </div>
+            <div>
+              <Label htmlFor="imageUrl">رابط الصورة</Label>
+              <Input
+                type="url"
+                id="imageUrl"
+                value={formData.imageUrl}
+                onChange={(e) => setFormData({ ...formData, imageUrl: e.target.value })}
+              />
+            </div>
+            <div>
+              <Label htmlFor="restaurantId">المطعم (اختياري)</Label>
+              <Select onValueChange={(value) => setFormData({ ...formData, restaurantId: value })}>
+                <SelectTrigger>
+                  <SelectValue placeholder="اختر المطعم" />
+                </SelectTrigger>
+                <SelectContent>
+                  {restaurants.map((restaurant) => (
+                    <SelectItem key={restaurant.id} value={restaurant.id}>
+                      {restaurant.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <Button type="submit" disabled={isSubmitting} className="w-full">
+              {isSubmitting ? "جاري الإرسال..." : "إضافة الطعام"}
+            </Button>
+          </form>
         </div>
       </main>
       <Footer />

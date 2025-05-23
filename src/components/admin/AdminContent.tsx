@@ -6,6 +6,8 @@ import AdminRestaurants from './AdminRestaurants';
 import AdminOrders from './AdminOrders';
 import AdminSettings from './AdminSettings';
 import AdminRefunds from './AdminRefunds';
+import AdminCoupons from './AdminCoupons'; // قسم الكوبونات الجديد
+import AdminPendingContent from './AdminPendingContent'; // قسم المراجعة الجديد
 import { Card, CardContent } from "@/components/ui/card";
 
 interface AdminContentProps {
@@ -24,11 +26,15 @@ const AdminContent: React.FC<AdminContentProps> = ({ activeTab, onTabChange }) =
       
       {activeTab === 'orders' && <AdminOrders />}
       
+      {activeTab === 'coupons' && <AdminCoupons />} {/* قسم الكوبونات الجديد */}
+      
+      {activeTab === 'pending' && <AdminPendingContent />} {/* قسم المراجعة الجديد */}
+      
       {activeTab === 'refunds' && <AdminRefunds />}
       
       {activeTab === 'settings' && <AdminSettings />}
       
-      {!['dashboard', 'users', 'restaurants', 'orders', 'settings', 'refunds'].includes(activeTab) && (
+      {!['dashboard', 'users', 'restaurants', 'orders', 'coupons', 'pending', 'settings', 'refunds', 'payments'].includes(activeTab) && (
         <Card>
           <CardContent className="py-10 text-center">
             <h3 className="text-xl font-bold mb-2">قسم غير متاح</h3>

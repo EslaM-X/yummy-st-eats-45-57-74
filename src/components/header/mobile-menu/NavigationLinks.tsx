@@ -1,6 +1,6 @@
 
 import React from 'react';
-import { Home, UtensilsCrossed, ShoppingBag, Gift, Users, ShieldCheck, FileText, Cookie } from "lucide-react";
+import { Home, UtensilsCrossed, ShoppingBag, Ticket, Users, ShieldCheck, FileText, Cookie } from "lucide-react"; // تم تغيير Gift إلى Ticket
 import { DropdownMenuItem } from "@/components/ui/dropdown-menu";
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useNavigate } from 'react-router-dom';
@@ -10,9 +10,8 @@ const navIcons: { [key: string]: React.ReactNode } = {
   home: <Home className="h-4 w-4 mr-2" />,
   restaurants: <UtensilsCrossed className="h-4 w-4 mr-2" />,
   products: <ShoppingBag className="h-4 w-4 mr-2" />,
-  rewards: <Gift className="h-4 w-4 mr-2" />,
+  coupons: <Ticket className="h-4 w-4 mr-2" />, // تم تغيير rewards إلى coupons
   addFood: <UtensilsCrossed className="h-4 w-4 mr-2" />,
-  team: <Users className="h-4 w-4 mr-2" />,
   privacyPolicy: <ShieldCheck className="h-4 w-4 mr-2" />,
   termsConditions: <FileText className="h-4 w-4 mr-2" />,
   cookiePolicy: <Cookie className="h-4 w-4 mr-2" />,
@@ -26,14 +25,13 @@ const NavigationLinks: React.FC<NavigationLinksProps> = ({ closeMenu }) => {
   const { t } = useLanguage();
   const navigate = useNavigate();
 
-  // Navigation links
+  // Navigation links - تم حذف team وتغيير rewards إلى coupons
   const navigationLinks = [
     { key: "home", title: t('home'), path: "/" },
     { key: "restaurants", title: t('restaurants'), path: "/restaurants" },
     { key: "products", title: t('products'), path: "/products" },
-    { key: "rewards", title: t('rewards'), path: "/rewards" },
+    { key: "coupons", title: "الكوبونات", path: "/coupons" }, // تم استبدال المكافآت بالكوبونات
     { key: "addFood", title: t('addFood'), path: "/add-food" },
-    { key: "team", title: t('team'), path: "/team" },
     { key: "privacyPolicy", title: t('privacyPolicy'), path: "/privacy-policy" },
     { key: "termsConditions", title: t('termsConditions'), path: "/terms-conditions" },
     { key: "cookiePolicy", title: t('cookiePolicy'), path: "/cookie-policy" },

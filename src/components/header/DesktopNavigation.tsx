@@ -12,7 +12,7 @@ const DesktopNavigation = () => {
     { name: t('home'), href: '/' },
     { name: t('restaurants'), href: '/restaurants' },
     { name: t('products'), href: '/products' },
-    { name: t('rewards'), href: '/rewards' },
+    { name: 'الكوبونات', href: '/coupons' }, // تم استبدال المكافآت بالكوبونات
   ];
 
   return (

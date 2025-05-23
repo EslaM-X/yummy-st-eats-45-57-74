@@ -1,169 +1,286 @@
 
--- تحسين الوظيفة لإنشاء ملف تعريف المستخدم مع معالجة أفضل للأخطاء
-CREATE OR REPLACE FUNCTION public.create_profile_for_user()
-RETURNS trigger
+-- إنشاء جدول الكوبونات
+CREATE TABLE IF NOT EXISTS public.coupons (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  title TEXT NOT NULL,
+  description TEXT,
+  discount_type TEXT CHECK (discount_type IN ('percentage', 'fixed_amount')) NOT NULL,
+  discount_value DECIMAL(10, 2) NOT NULL,
+  minimum_order DECIMAL(10, 2) DEFAULT 0,
+  max_uses INTEGER,
+  used_count INTEGER DEFAULT 0,
+  expires_at TIMESTAMP WITH TIME ZONE,
+  is_active BOOLEAN DEFAULT true,
+  created_by UUID REFERENCES auth.users(id),
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- إنشاء جدول كوبونات المستخدمين
+CREATE TABLE IF NOT EXISTS public.user_coupons (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE NOT NULL,
+  coupon_id UUID REFERENCES public.coupons(id) ON DELETE CASCADE NOT NULL,
+  used_at TIMESTAMP WITH TIME ZONE,
+  order_id UUID, -- reference to order when used
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  UNIQUE(user_id, coupon_id)
+);
+
+-- إنشاء جدول المطاعم المعلقة للموافقة
+CREATE TABLE IF NOT EXISTS public.pending_restaurants (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  name TEXT NOT NULL,
+  description TEXT,
+  address TEXT,
+  phone TEXT,
+  email TEXT,
+  image_url TEXT,
+  cuisine_type TEXT,
+  owner_id UUID REFERENCES auth.users(id) ON DELETE CASCADE NOT NULL,
+  status TEXT CHECK (status IN ('pending', 'approved', 'rejected')) DEFAULT 'pending',
+  admin_notes TEXT,
+  reviewed_by UUID REFERENCES auth.users(id),
+  reviewed_at TIMESTAMP WITH TIME ZONE,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- إنشاء جدول الأطعمة المعلقة للموافقة
+CREATE TABLE IF NOT EXISTS public.pending_foods (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  name TEXT NOT NULL,
+  description TEXT,
+  price DECIMAL(10, 2) NOT NULL,
+  category TEXT,
+  image_url TEXT,
+  restaurant_id UUID,
+  owner_id UUID REFERENCES auth.users(id) ON DELETE CASCADE NOT NULL,
+  status TEXT CHECK (status IN ('pending', 'approved', 'rejected')) DEFAULT 'pending',
+  admin_notes TEXT,
+  reviewed_by UUID REFERENCES auth.users(id),
+  reviewed_at TIMESTAMP WITH TIME ZONE,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- إنشاء جدول الإشعارات
+CREATE TABLE IF NOT EXISTS public.notifications (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE NOT NULL,
+  title TEXT NOT NULL,
+  message TEXT NOT NULL,
+  type TEXT CHECK (type IN ('info', 'success', 'warning', 'error', 'coupon', 'approval')) NOT NULL,
+  is_read BOOLEAN DEFAULT false,
+  related_id UUID, -- can reference coupon_id, restaurant_id, etc.
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- إنشاء جدول إعدادات الإدارة
+CREATE TABLE IF NOT EXISTS public.admin_settings (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  setting_key TEXT UNIQUE NOT NULL,
+  setting_value TEXT,
+  description TEXT,
+  updated_by UUID REFERENCES auth.users(id),
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- إدراج إعدادات افتراضية
+INSERT INTO public.admin_settings (setting_key, setting_value, description) 
+VALUES 
+  ('auto_approve_restaurants', 'false', 'Auto approve restaurant registrations'),
+  ('auto_approve_foods', 'false', 'Auto approve food submissions')
+ON CONFLICT (setting_key) DO NOTHING;
+
+-- تمكين RLS على جميع الجداول الجديدة
+ALTER TABLE public.coupons ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.user_coupons ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.pending_restaurants ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.pending_foods ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.notifications ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.admin_settings ENABLE ROW LEVEL SECURITY;
+
+-- سياسات للكوبونات
+CREATE POLICY "Users can view active coupons" ON public.coupons
+  FOR SELECT USING (is_active = true);
+
+CREATE POLICY "Admins can manage coupons" ON public.coupons
+  FOR ALL USING (
+    EXISTS (
+      SELECT 1 FROM public.profiles 
+      WHERE id = auth.uid() AND user_type = 'admin'
+    )
+  );
+
+-- سياسات لكوبونات المستخدمين
+CREATE POLICY "Users can view own coupons" ON public.user_coupons
+  FOR SELECT USING (auth.uid() = user_id);
+
+CREATE POLICY "Users can use own coupons" ON public.user_coupons
+  FOR UPDATE USING (auth.uid() = user_id);
+
+-- سياسات للمطاعم المعلقة
+CREATE POLICY "Restaurant owners can view own submissions" ON public.pending_restaurants
+  FOR SELECT USING (auth.uid() = owner_id);
+
+CREATE POLICY "Users can submit restaurants" ON public.pending_restaurants
+  FOR INSERT WITH CHECK (auth.uid() = owner_id);
+
+CREATE POLICY "Admins can manage pending restaurants" ON public.pending_restaurants
+  FOR ALL USING (
+    EXISTS (
+      SELECT 1 FROM public.profiles 
+      WHERE id = auth.uid() AND user_type = 'admin'
+    )
+  );
+
+-- سياسات للأطعمة المعلقة
+CREATE POLICY "Food owners can view own submissions" ON public.pending_foods
+  FOR SELECT USING (auth.uid() = owner_id);
+
+CREATE POLICY "Users can submit foods" ON public.pending_foods
+  FOR INSERT WITH CHECK (auth.uid() = owner_id);
+
+CREATE POLICY "Admins can manage pending foods" ON public.pending_foods
+  FOR ALL USING (
+    EXISTS (
+      SELECT 1 FROM public.profiles 
+      WHERE id = auth.uid() AND user_type = 'admin'
+    )
+  );
+
+-- سياسات للإشعارات
+CREATE POLICY "Users can view own notifications" ON public.notifications
+  FOR SELECT USING (auth.uid() = user_id);
+
+CREATE POLICY "Users can update own notifications" ON public.notifications
+  FOR UPDATE USING (auth.uid() = user_id);
+
+CREATE POLICY "Admins can create notifications" ON public.notifications
+  FOR INSERT WITH CHECK (
+    EXISTS (
+      SELECT 1 FROM public.profiles 
+      WHERE id = auth.uid() AND user_type = 'admin'
+    )
+  );
+
+-- سياسات لإعدادات الإدارة
+CREATE POLICY "Admins can manage settings" ON public.admin_settings
+  FOR ALL USING (
+    EXISTS (
+      SELECT 1 FROM public.profiles 
+      WHERE id = auth.uid() AND user_type = 'admin'
+    )
+  );
+
+-- إنشاء فهارس لتحسين الأداء
+CREATE INDEX IF NOT EXISTS idx_coupons_active ON public.coupons(is_active);
+CREATE INDEX IF NOT EXISTS idx_user_coupons_user_id ON public.user_coupons(user_id);
+CREATE INDEX IF NOT EXISTS idx_pending_restaurants_status ON public.pending_restaurants(status);
+CREATE INDEX IF NOT EXISTS idx_pending_foods_status ON public.pending_foods(status);
+CREATE INDEX IF NOT EXISTS idx_notifications_user_id ON public.notifications(user_id);
+CREATE INDEX IF NOT EXISTS idx_notifications_is_read ON public.notifications(is_read);
+
+-- دالة لإنشاء إشعار جديد
+CREATE OR REPLACE FUNCTION public.create_notification(
+  p_user_id UUID,
+  p_title TEXT,
+  p_message TEXT,
+  p_type TEXT,
+  p_related_id UUID DEFAULT NULL
+)
+RETURNS UUID
 LANGUAGE plpgsql
 SECURITY DEFINER
-SET search_path TO 'public'
 AS $$
 DECLARE
-  username_count integer;
-  email_count integer;
+  notification_id UUID;
 BEGIN
-  -- فحص ما إذا كان الملف الشخصي موجودًا بالفعل لتجنب خطأ المفتاح المكرر
-  IF EXISTS (SELECT 1 FROM public.profiles WHERE id = new.id) THEN
-    -- الملف الشخصي موجود بالفعل، لا تحاول إنشاءه مرة أخرى
-    RETURN new;
-  END IF;
-
-  -- التحقق من وجود اسم المستخدم
-  IF new.raw_user_meta_data->>'username' IS NOT NULL THEN
-    SELECT count(*) INTO username_count FROM public.profiles 
-    WHERE username = new.raw_user_meta_data->>'username';
-    
-    IF username_count > 0 THEN
-      RAISE EXCEPTION 'username_already_exists';
-    END IF;
-  END IF;
-
-  -- التحقق من وجود البريد الإلكتروني (إضافي، لأن Supabase يتحقق من ذلك تلقائيًا)
-  IF new.email IS NOT NULL THEN
-    SELECT count(*) INTO email_count FROM auth.users 
-    WHERE email = new.email AND id <> new.id;
-    
-    IF email_count > 0 THEN
-      RAISE EXCEPTION 'email_already_exists';
-    END IF;
-  END IF;
-
-  -- إنشاء الملف الشخصي
-  BEGIN
-    INSERT INTO public.profiles (
-      id, 
-      email, 
-      full_name, 
-      username, 
-      phone, 
-      user_type,
-      created_at,
-      updated_at
-    )
-    VALUES (
-      new.id,
-      new.email,
-      COALESCE(new.raw_user_meta_data->>'full_name', ''),
-      COALESCE(new.raw_user_meta_data->>'username', ''),
-      COALESCE(new.raw_user_meta_data->>'phone', ''),
-      COALESCE(new.raw_user_meta_data->>'user_type', 'customer'),
-      NOW(),
-      NOW()
-    );
-    EXCEPTION
-      WHEN unique_violation THEN
-        -- في حالة حدوث مشكلة تكرارية، تحقق من السبب
-        IF EXISTS (SELECT 1 FROM public.profiles WHERE username = COALESCE(new.raw_user_meta_data->>'username', '')) THEN
-          RAISE EXCEPTION 'username_already_exists';
-        ELSE
-          -- لسبب آخر، فقط استمر - الملف الشخصي موجود بالفعل
-          RETURN new;
-        END IF;
-      WHEN others THEN
-        RAISE LOG 'Error in create_profile_for_user: %, SQLSTATE: %', SQLERRM, SQLSTATE;
-        RETURN new; -- لا تزال تعيد new لعدم منع التسجيل، لكن سجل الخطأ
-  END;
-
-  RETURN new;
+  INSERT INTO public.notifications (user_id, title, message, type, related_id)
+  VALUES (p_user_id, p_title, p_message, p_type, p_related_id)
+  RETURNING id INTO notification_id;
+  
+  RETURN notification_id;
 END;
 $$;
 
--- التأكد من وجود المشغل
-DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users;
-CREATE TRIGGER on_auth_user_created
-  AFTER INSERT ON auth.users
-  FOR EACH ROW EXECUTE PROCEDURE public.create_profile_for_user();
-
--- تمكين RLS على جدول profiles
-ALTER TABLE public.profiles ENABLE ROW LEVEL SECURITY;
-
--- حذف السياسات الموجودة إن وجدت
-DROP POLICY IF EXISTS "Users can view own profile" ON public.profiles;
-DROP POLICY IF EXISTS "Users can update own profile" ON public.profiles;
-DROP POLICY IF EXISTS "Enable profile creation during signup" ON public.profiles;
-DROP POLICY IF EXISTS "Service role can manage all profiles" ON public.profiles;
-
--- سياسة للسماح للمستخدمين بعرض ملفهم الشخصي
-CREATE POLICY "Users can view own profile" ON public.profiles
-  FOR SELECT USING (auth.uid() = id);
-
--- سياسة للسماح للمستخدمين بتحديث ملفهم الشخصي
-CREATE POLICY "Users can update own profile" ON public.profiles
-  FOR UPDATE USING (auth.uid() = id);
-
--- سياسة للسماح بإنشاء الملف الشخصي أثناء التسجيل (هذا أمر حاسم)
-CREATE POLICY "Enable profile creation during signup" ON public.profiles
-  FOR INSERT WITH CHECK (auth.uid() = id);
-
--- سياسة للسماح لدور الخدمة (المستخدم في المشغلات) بإدارة جميع الملفات الشخصية
-CREATE POLICY "Service role can manage all profiles" ON public.profiles
-  FOR ALL USING (
-    -- السماح إذا كان دور الخدمة أو إذا كان الملف الشخصي للمستخدم نفسه
-    auth.jwt() ->> 'role' = 'service_role' OR auth.uid() = id
-  );
-
--- منح الصلاحيات اللازمة للمستخدمين المصادقين
-GRANT SELECT, UPDATE ON public.profiles TO authenticated;
-GRANT INSERT ON public.profiles TO authenticated;
-
--- منح الصلاحيات لدور الخدمة للمشغل
-GRANT ALL ON public.profiles TO service_role;
-
--- التأكد من وجود جدول profiles بهيكل مناسب
--- تعديل الجدول إذا كان موجودًا
-DO $$
+-- دالة لتطبيق كوبون على طلب
+CREATE OR REPLACE FUNCTION public.apply_coupon(
+  p_user_id UUID,
+  p_coupon_id UUID,
+  p_order_total DECIMAL
+)
+RETURNS TABLE(
+  success BOOLEAN,
+  discount_amount DECIMAL,
+  message TEXT
+)
+LANGUAGE plpgsql
+SECURITY DEFINER
+AS $$
+DECLARE
+  coupon_record RECORD;
+  calculated_discount DECIMAL;
+  user_coupon_exists BOOLEAN;
 BEGIN
-  IF EXISTS (SELECT FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'profiles') THEN
-    -- إضافة أعمدة إضافية إذا لم تكن موجودة
-    IF NOT EXISTS (SELECT FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'profiles' AND column_name = 'created_at') THEN
-      ALTER TABLE public.profiles ADD COLUMN created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW();
-    END IF;
-    
-    IF NOT EXISTS (SELECT FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'profiles' AND column_name = 'updated_at') THEN
-      ALTER TABLE public.profiles ADD COLUMN updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW();
-    END IF;
-    
-    -- أي تعديلات إضافية على الجدول...
-  ELSE
-    -- إنشاء الجدول إذا لم يكن موجودًا
-    CREATE TABLE public.profiles (
-      id UUID REFERENCES auth.users(id) ON DELETE CASCADE PRIMARY KEY,
-      email TEXT,
-      full_name TEXT,
-      username TEXT UNIQUE,
-      phone TEXT,
-      address TEXT,
-      avatar_url TEXT,
-      user_type TEXT DEFAULT 'customer' CHECK (user_type IN ('customer', 'restaurant_owner', 'admin')),
-      created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-      updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-    );
+  -- التحقق من وجود الكوبون وصحته
+  SELECT * INTO coupon_record
+  FROM public.coupons
+  WHERE id = p_coupon_id 
+    AND is_active = true
+    AND (expires_at IS NULL OR expires_at > NOW())
+    AND (max_uses IS NULL OR used_count < max_uses);
+  
+  IF NOT FOUND THEN
+    RETURN QUERY SELECT false, 0::DECIMAL, 'كوبون غير صالح أو منتهي الصلاحية'::TEXT;
+    RETURN;
   END IF;
-END$$;
-
--- إنشاء فهارس على البريد الإلكتروني واسم المستخدم لعمليات البحث الأسرع
-CREATE INDEX IF NOT EXISTS profiles_email_idx ON public.profiles(email);
-CREATE INDEX IF NOT EXISTS profiles_username_idx ON public.profiles(username);
-
--- تحديث المشغل لتحديث عمود updated_at
-CREATE OR REPLACE FUNCTION public.update_updated_at_column()
-RETURNS TRIGGER AS $$
-BEGIN
-  NEW.updated_at = NOW();
-  RETURN NEW;
+  
+  -- التحقق من الحد الأدنى للطلب
+  IF p_order_total < coupon_record.minimum_order THEN
+    RETURN QUERY SELECT false, 0::DECIMAL, 
+      ('الحد الأدنى للطلب هو ' || coupon_record.minimum_order::TEXT)::TEXT;
+    RETURN;
+  END IF;
+  
+  -- التحقق من استخدام المستخدم للكوبون من قبل
+  SELECT EXISTS(
+    SELECT 1 FROM public.user_coupons 
+    WHERE user_id = p_user_id AND coupon_id = p_coupon_id
+  ) INTO user_coupon_exists;
+  
+  IF user_coupon_exists THEN
+    RETURN QUERY SELECT false, 0::DECIMAL, 'تم استخدام هذا الكوبون من قبل'::TEXT;
+    RETURN;
+  END IF;
+  
+  -- حساب قيمة الخصم
+  IF coupon_record.discount_type = 'percentage' THEN
+    calculated_discount := p_order_total * (coupon_record.discount_value / 100);
+  ELSE
+    calculated_discount := coupon_record.discount_value;
+  END IF;
+  
+  -- التأكد من عدم تجاوز قيمة الخصم قيمة الطلب
+  IF calculated_discount > p_order_total THEN
+    calculated_discount := p_order_total;
+  END IF;
+  
+  RETURN QUERY SELECT true, calculated_discount, 'تم تطبيق الكوبون بنجاح'::TEXT;
 END;
-$$ language 'plpgsql';
+$$;
 
-DROP TRIGGER IF EXISTS update_profiles_updated_at ON public.profiles;
-CREATE TRIGGER update_profiles_updated_at
-  BEFORE UPDATE ON public.profiles
-  FOR EACH ROW
-  EXECUTE FUNCTION public.update_updated_at_column();
+-- منح الصلاحيات اللازمة
+GRANT ALL ON public.coupons TO authenticated;
+GRANT ALL ON public.user_coupons TO authenticated;
+GRANT ALL ON public.pending_restaurants TO authenticated;
+GRANT ALL ON public.pending_foods TO authenticated;
+GRANT ALL ON public.notifications TO authenticated;
+GRANT ALL ON public.admin_settings TO authenticated;
+GRANT ALL ON public.coupons TO service_role;
+GRANT ALL ON public.user_coupons TO service_role;
+GRANT ALL ON public.pending_restaurants TO service_role;
+GRANT ALL ON public.pending_foods TO service_role;
+GRANT ALL ON public.notifications TO service_role;
+GRANT ALL ON public.admin_settings TO service_role;

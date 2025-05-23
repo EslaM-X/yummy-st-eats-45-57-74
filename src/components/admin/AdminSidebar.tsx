@@ -1,6 +1,6 @@
 
 import React from 'react';
-import { BarChart3, Users, Store, ShoppingCart, Settings, LogOut, CreditCard, RefreshCw } from 'lucide-react';
+import { BarChart3, Users, Store, ShoppingCart, Settings, LogOut, CreditCard, RefreshCw, Ticket, Clock } from 'lucide-react'; // تم إضافة Ticket و Clock
 
 interface AdminSidebarProps {
   activeTab: string;
@@ -22,6 +22,8 @@ const AdminSidebar: React.FC<AdminSidebarProps> = ({
     { id: 'users', name: 'المستخدمين', icon: <Users className="h-5 w-5" /> },
     { id: 'restaurants', name: 'المطاعم', icon: <Store className="h-5 w-5" /> },
     { id: 'orders', name: 'الطلبات', icon: <ShoppingCart className="h-5 w-5" /> },
+    { id: 'coupons', name: 'الكوبونات', icon: <Ticket className="h-5 w-5" /> }, // قسم جديد للكوبونات
+    { id: 'pending', name: 'المراجعة', icon: <Clock className="h-5 w-5" /> }, // قسم جديد للمحتوى المعلق
     { id: 'payments', name: 'المدفوعات', icon: <CreditCard className="h-5 w-5" /> },
     { id: 'refunds', name: 'الاستردادات', icon: <RefreshCw className="h-5 w-5" /> },
     { id: 'settings', name: 'الإعدادات', icon: <Settings className="h-5 w-5" /> },
