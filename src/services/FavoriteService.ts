@@ -1,87 +1,127 @@
 
-// Mock Favorite Service لتجنب أخطاء قاعدة البيانات
-interface Favorite {
-  id: string;
-  user_id: string;
-  restaurant_id?: string;
-  product_id?: string;
-  created_at: string;
-}
+import { supabase } from '@/integrations/supabase/client';
 
 export class FavoriteService {
-  private static mockFavorites: Favorite[] = [];
-
-  static async getUserFavorites(userId: string): Promise<Favorite[]> {
-    // إرجاع المفضلات الوهمية للمستخدم
-    return this.mockFavorites.filter(fav => fav.user_id === userId);
-  }
-
-  static async addToFavorites(userId: string, itemId: string, type: 'restaurant' | 'product'): Promise<boolean> {
+  static async addFavorite(userId: string, productId?: string, restaurantId?: string) {
     try {
-      const favorite: Favorite = {
-        id: Math.random().toString(36).substr(2, 9),
-        user_id: userId,
-        [type === 'restaurant' ? 'restaurant_id' : 'product_id']: itemId,
-        created_at: new Date().toISOString()
-      };
-
-      this.mockFavorites.push(favorite);
-      return true;
-    } catch (error) {
-      console.error('Error adding to favorites:', error);
-      return false;
-    }
-  }
-
-  static async removeFromFavorites(userId: string, itemId: string, type: 'restaurant' | 'product'): Promise<boolean> {
-    try {
-      const index = this.mockFavorites.findIndex(fav => 
-        fav.user_id === userId && 
-        (type === 'restaurant' ? fav.restaurant_id === itemId : fav.product_id === itemId)
-      );
-
-      if (index !== -1) {
-        this.mockFavorites.splice(index, 1);
-        return true;
+      const { data, error } = await supabase
+        .from('favorites')
+        .insert({
+          user_id: userId,
+          product_id: productId,
+          restaurant_id: restaurantId
+        })
+        .select();
+      
+      if (error) {
+        console.error('Error adding favorite:', error);
+        return { success: false, error };
       }
-      return false;
+      
+      return { success: true, data };
     } catch (error) {
-      console.error('Error removing from favorites:', error);
-      return false;
+      console.error('Exception adding favorite:', error);
+      return { success: false, error };
     }
   }
-
-  static async isFavorite(userId: string, itemId: string, type: 'restaurant' | 'product'): Promise<boolean> {
+  
+  static async removeFavorite(userId: string, productId?: string, restaurantId?: string) {
     try {
-      return this.mockFavorites.some(fav => 
-        fav.user_id === userId && 
-        (type === 'restaurant' ? fav.restaurant_id === itemId : fav.product_id === itemId)
-      );
+      let query = supabase
+        .from('favorites')
+        .delete()
+        .eq('user_id', userId);
+      
+      if (productId) {
+        query = query.eq('product_id', productId);
+      }
+      
+      if (restaurantId) {
+        query = query.eq('restaurant_id', restaurantId);
+      }
+      
+      const { error } = await query;
+      
+      if (error) {
+        console.error('Error removing favorite:', error);
+        return { success: false, error };
+      }
+      
+      return { success: true };
     } catch (error) {
-      console.error('Error checking favorite status:', error);
+      console.error('Exception removing favorite:', error);
+      return { success: false, error };
+    }
+  }
+  
+  static async getUserFavorites(userId: string) {
+    try {
+      const { data: restaurantFavorites, error: restaurantError } = await supabase
+        .from('favorites')
+        .select(`
+          id,
+          restaurant_id,
+          restaurants (*)
+        `)
+        .eq('user_id', userId)
+        .not('restaurant_id', 'is', null);
+      
+      const { data: productFavorites, error: productError } = await supabase
+        .from('favorites')
+        .select(`
+          id,
+          product_id,
+          products (*)
+        `)
+        .eq('user_id', userId)
+        .not('product_id', 'is', null);
+      
+      if (restaurantError || productError) {
+        console.error('Error fetching favorites:', restaurantError || productError);
+        return { 
+          restaurants: [],
+          products: [],
+          error: restaurantError || productError
+        };
+      }
+      
+      return {
+        restaurants: restaurantFavorites || [],
+        products: productFavorites || [],
+        error: null
+      };
+    } catch (error) {
+      console.error('Exception fetching favorites:', error);
+      return { restaurants: [], products: [], error };
+    }
+  }
+  
+  static async isFavorite(userId: string, productId?: string, restaurantId?: string) {
+    try {
+      let query = supabase
+        .from('favorites')
+        .select('id')
+        .eq('user_id', userId);
+      
+      if (productId) {
+        query = query.eq('product_id', productId);
+      }
+      
+      if (restaurantId) {
+        query = query.eq('restaurant_id', restaurantId);
+      }
+      
+      const { data, error } = await query;
+      
+      if (error) {
+        console.error('Error checking favorite status:', error);
+        return false;
+      }
+      
+      return (data && data.length > 0);
+    } catch (error) {
+      console.error('Exception checking favorite status:', error);
       return false;
-    }
-  }
-
-  static async getFavoriteRestaurants(userId: string): Promise<string[]> {
-    try {
-      return this.mockFavorites
-        .filter(fav => fav.user_id === userId && fav.restaurant_id)
-        .map(fav => fav.restaurant_id!);
-    } catch (error) {
-      console.error('Error getting favorite restaurants:', error);
-      return [];
-    }
-  }
-
-  static async getFavoriteProducts(userId: string): Promise<string[]> {
-    try {
-      return this.mockFavorites
-        .filter(fav => fav.user_id === userId && fav.product_id)
-        .map(fav => fav.product_id!);
-    } catch (error) {
-      console.error('Error getting favorite products:', error);
-      return [];
     }
   }
 }

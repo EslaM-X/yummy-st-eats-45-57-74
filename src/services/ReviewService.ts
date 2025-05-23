@@ -1,113 +1,173 @@
 
-// Mock Review Service لتجنب أخطاء قاعدة البيانات
-interface Review {
-  id: string;
-  user_id: string;
-  restaurant_id?: string;
-  product_id?: string;
-  rating: number;
-  comment: string;
-  created_at: string;
-  user_name?: string;
-}
+import { supabase } from '@/integrations/supabase/client';
 
-export class ReviewService {
-  private static mockReviews: Review[] = [
-    {
-      id: '1',
-      user_id: 'user1',
-      restaurant_id: 'rest1',
-      rating: 5,
-      comment: 'مطعم ممتاز والطعام لذيذ جداً',
-      created_at: new Date().toISOString(),
-      user_name: 'أحمد محمد'
-    },
-    {
-      id: '2',
-      user_id: 'user2',
-      product_id: 'prod1',
-      rating: 4,
-      comment: 'طعم رائع وتوصيل سريع',
-      created_at: new Date().toISOString(),
-      user_name: 'سارة أحمد'
-    }
-  ];
-
-  static async getRestaurantReviews(restaurantId: string): Promise<Review[]> {
+/**
+ * خدمة التعامل مع التقييمات في التطبيق
+ */
+export const ReviewService = {
+  /**
+   * جلب تقييمات المنتج
+   */
+  async getProductReviews(product_id: string) {
     try {
-      return this.mockReviews.filter(review => review.restaurant_id === restaurantId);
-    } catch (error) {
-      console.error('Error fetching restaurant reviews:', error);
-      return [];
+      const { data, error } = await supabase
+        .from('reviews')
+        .select(`
+          *,
+          profiles(id, full_name, avatar_url)
+        `)
+        .eq('product_id', product_id)
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+
+      return { data, error: null };
+    } catch (error: any) {
+      console.error(`Error fetching reviews for product ${product_id}:`, error);
+      return { data: [], error };
     }
-  }
+  },
 
-  static async getProductReviews(productId: string): Promise<Review[]> {
+  /**
+   * جلب تقييمات المطعم
+   */
+  async getRestaurantReviews(restaurant_id: string) {
     try {
-      return this.mockReviews.filter(review => review.product_id === productId);
-    } catch (error) {
-      console.error('Error fetching product reviews:', error);
-      return [];
+      const { data, error } = await supabase
+        .from('reviews')
+        .select(`
+          *,
+          profiles(id, full_name, avatar_url)
+        `)
+        .eq('restaurant_id', restaurant_id)
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+
+      return { data, error: null };
+    } catch (error: any) {
+      console.error(`Error fetching reviews for restaurant ${restaurant_id}:`, error);
+      return { data: [], error };
     }
-  }
+  },
 
-  static async addReview(review: Omit<Review, 'id' | 'created_at'>): Promise<boolean> {
+  /**
+   * إضافة تقييم لمنتج
+   */
+  async addProductReview(product_id: string, rating: number, comment?: string) {
     try {
-      const newReview: Review = {
-        ...review,
-        id: Math.random().toString(36).substr(2, 9),
-        created_at: new Date().toISOString()
-      };
+      const { data, error } = await supabase
+        .from('reviews')
+        .insert({
+          product_id,
+          rating,
+          comment
+        })
+        .select()
+        .single();
 
-      this.mockReviews.push(newReview);
-      return true;
-    } catch (error) {
-      console.error('Error adding review:', error);
-      return false;
+      if (error) throw error;
+
+      return { data, error: null };
+    } catch (error: any) {
+      console.error('Error adding product review:', error);
+      return { data: null, error };
     }
-  }
+  },
 
-  static async updateReview(reviewId: string, updates: Partial<Review>): Promise<boolean> {
+  /**
+   * إضافة تقييم لمطعم
+   */
+  async addRestaurantReview(restaurant_id: string, rating: number, comment?: string) {
     try {
-      const index = this.mockReviews.findIndex(review => review.id === reviewId);
-      if (index !== -1) {
-        this.mockReviews[index] = { ...this.mockReviews[index], ...updates };
-        return true;
+      const { data, error } = await supabase
+        .from('reviews')
+        .insert({
+          restaurant_id,
+          rating,
+          comment
+        })
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      // تحديث متوسط تقييم المطعم
+      await this.updateRestaurantAverageRating(restaurant_id);
+
+      return { data, error: null };
+    } catch (error: any) {
+      console.error('Error adding restaurant review:', error);
+      return { data: null, error };
+    }
+  },
+
+  /**
+   * حذف تقييم
+   */
+  async deleteReview(review_id: string) {
+    try {
+      // جلب معلومات التقييم قبل الحذف لمعرفة ما إذا كان للمنتج أو للمطعم
+      const { data: review_data } = await supabase
+        .from('reviews')
+        .select('restaurant_id')
+        .eq('id', review_id)
+        .maybeSingle();
+
+      const restaurant_id = review_data?.restaurant_id;
+      
+      // حذف التقييم
+      const { error } = await supabase
+        .from('reviews')
+        .delete()
+        .eq('id', review_id);
+
+      if (error) throw error;
+
+      // إذا كان التقييم لمطعم، تحديث متوسط تقييم المطعم
+      if (restaurant_id) {
+        await this.updateRestaurantAverageRating(restaurant_id);
       }
-      return false;
-    } catch (error) {
-      console.error('Error updating review:', error);
-      return false;
-    }
-  }
 
-  static async deleteReview(reviewId: string): Promise<boolean> {
+      return { success: true, error: null };
+    } catch (error: any) {
+      console.error(`Error deleting review with ID ${review_id}:`, error);
+      return { success: false, error };
+    }
+  },
+
+  /**
+   * تحديث متوسط تقييم المطعم
+   */
+  async updateRestaurantAverageRating(restaurant_id: string) {
     try {
-      const index = this.mockReviews.findIndex(review => review.id === reviewId);
-      if (index !== -1) {
-        this.mockReviews.splice(index, 1);
-        return true;
+      // حساب متوسط التقييم
+      const { data, error } = await supabase
+        .from('reviews')
+        .select('rating')
+        .eq('restaurant_id', restaurant_id);
+
+      if (error) throw error;
+
+      if (!data || data.length === 0) {
+        return;
       }
-      return false;
+
+      const avg_rating = data.reduce((sum, review) => sum + review.rating, 0) / data.length;
+      const rating_count = data.length;
+
+      // تحديث المطعم
+      const { error: update_error } = await supabase
+        .from('restaurants')
+        .update({
+          avg_rating: parseFloat(avg_rating.toFixed(1)),
+          rating_count
+        })
+        .eq('id', restaurant_id);
+
+      if (update_error) throw update_error;
     } catch (error) {
-      console.error('Error deleting review:', error);
-      return false;
+      console.error(`Error updating average rating for restaurant ${restaurant_id}:`, error);
     }
   }
-
-  static async getAverageRating(itemId: string, type: 'restaurant' | 'product'): Promise<number> {
-    try {
-      const reviews = this.mockReviews.filter(review => 
-        type === 'restaurant' ? review.restaurant_id === itemId : review.product_id === itemId
-      );
-
-      if (reviews.length === 0) return 0;
-
-      const totalRating = reviews.reduce((sum, review) => sum + review.rating, 0);
-      return Number((totalRating / reviews.length).toFixed(1));
-    } catch (error) {
-      console.error('Error calculating average rating:', error);
-      return 0;
-    }
-  }
-}
+};
