@@ -67,7 +67,16 @@ const RegisterForm: React.FC<RegisterFormProps> = ({ onSuccess }) => {
       // استخدام وظيفة signUp من AuthContext
       const { error, data } = await signUp(values.email, values.password, metadata);
       
-      if (error) throw error;
+      if (error) {
+        console.error('Signup error:', error);
+        
+        // Check for duplicate profile error
+        if (error.message && error.message.includes('duplicate key')) {
+          throw new Error('البريد الإلكتروني مستخدم بالفعل. يرجى استخدام بريد إلكتروني آخر أو تسجيل الدخول.');
+        }
+        
+        throw error;
+      }
       
       // حفظ البريد الإلكتروني للمستخدم المسجل للاستخدام في إعادة الإرسال
       setRegisteredEmail(values.email);

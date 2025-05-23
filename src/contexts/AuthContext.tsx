@@ -1,4 +1,3 @@
-
 import React, { createContext, useState, useEffect, useContext } from 'react';
 import { User, Session } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
@@ -108,7 +107,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, []);
 
   const signUp = async (email: string, password: string, metadata?: any) => {
-    return await authService.signUp(email, password, metadata);
+    try {
+      console.log('Signing up with metadata:', metadata);
+      return await authService.signUp(email, password, metadata);
+    } catch (error: any) {
+      console.error('Sign up error:', error);
+      return { data: null, error };
+    }
   };
 
   const signIn = async (email: string, password: string) => {

@@ -1,94 +1,48 @@
 
--- Let's create a rewards table to store available rewards
-CREATE TABLE IF NOT EXISTS public.rewards (
-  id UUID NOT NULL DEFAULT gen_random_uuid() PRIMARY KEY,
-  name TEXT NOT NULL,
-  description TEXT,
-  points INTEGER NOT NULL,
-  type TEXT NOT NULL,
-  image_url TEXT,
-  expiry_date DATE,
-  is_active BOOLEAN DEFAULT true,
-  created_at TIMESTAMP WITH TIME ZONE DEFAULT now()
-);
-
--- Create a procedure to update user points
-CREATE OR REPLACE FUNCTION public.update_user_points(user_id_param UUID, points_to_add INTEGER)
-RETURNS INTEGER
+-- Updated function to safely handle profile creation with better error handling
+CREATE OR REPLACE FUNCTION public.create_profile_for_user()
+RETURNS trigger
 LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path TO 'public'
 AS $$
-DECLARE
-  new_total INTEGER;
-  new_lifetime_points INTEGER;
-  new_level TEXT;
 BEGIN
-  -- Check if user exists in reward_points table
-  IF NOT EXISTS (SELECT 1 FROM reward_points WHERE user_id = user_id_param) THEN
-    -- Create new user record with initial points
-    INSERT INTO reward_points (user_id, points, lifetime_points, level)
-    VALUES (
-      user_id_param,
-      GREATEST(0, points_to_add), -- Ensure not negative for new users
-      GREATEST(0, points_to_add), -- Ensure not negative for new users
-      CASE 
-        WHEN points_to_add >= 2500 THEN 'platinumTier'
-        WHEN points_to_add >= 1000 THEN 'goldTier'
-        WHEN points_to_add >= 500 THEN 'silverTier'
-        ELSE 'bronzeTier'
-      END
-    );
-    
-    SELECT points INTO new_total FROM reward_points WHERE user_id = user_id_param;
-  ELSE
-    -- Update existing user points
-    SELECT points + points_to_add, lifetime_points + GREATEST(0, points_to_add) 
-    INTO new_total, new_lifetime_points
-    FROM reward_points WHERE user_id = user_id_param;
-    
-    -- Ensure points don't go below zero
-    IF new_total < 0 THEN
-      new_total := 0;
-    END IF;
-    
-    -- Calculate new level based on lifetime points
-    SELECT 
-      CASE 
-        WHEN new_lifetime_points >= 2500 THEN 'platinumTier'
-        WHEN new_lifetime_points >= 1000 THEN 'goldTier'
-        WHEN new_lifetime_points >= 500 THEN 'silverTier'
-        ELSE 'bronzeTier'
-      END INTO new_level;
-      
-    -- Update the record
-    UPDATE reward_points
-    SET 
-      points = new_total,
-      lifetime_points = new_lifetime_points,
-      level = new_level,
-      updated_at = now()
-    WHERE user_id = user_id_param;
+  -- Check if profile already exists to avoid duplicate key error
+  IF EXISTS (SELECT 1 FROM public.profiles WHERE id = new.id) THEN
+    -- Profile already exists, don't try to create it again
+    RETURN new;
   END IF;
-  
-  RETURN new_total;
+
+  INSERT INTO public.profiles (
+    id, 
+    email, 
+    full_name, 
+    username, 
+    phone, 
+    user_type
+  )
+  VALUES (
+    new.id,
+    new.email,
+    COALESCE(new.raw_user_meta_data->>'full_name', ''),
+    COALESCE(new.raw_user_meta_data->>'username', ''),
+    COALESCE(new.raw_user_meta_data->>'phone', ''),
+    COALESCE(new.raw_user_meta_data->>'user_type', 'customer')
+  );
+
+  RETURN new;
+EXCEPTION
+  WHEN unique_violation THEN
+    -- In case of race condition, just continue - the profile already exists
+    RETURN new;
+  WHEN others THEN
+    RAISE LOG 'Error in create_profile_for_user: %', SQLERRM;
+    RETURN new; -- Still return new to not block signup, but log the error
 END;
 $$;
 
--- Add RLS policies for reward_points and reward_points_history tables
-ALTER TABLE IF EXISTS public.reward_points ENABLE ROW LEVEL SECURITY;
-ALTER TABLE IF EXISTS public.reward_points_history ENABLE ROW LEVEL SECURITY;
-ALTER TABLE IF EXISTS public.rewards ENABLE ROW LEVEL SECURITY;
-
--- User can read their own reward points
-DROP POLICY IF EXISTS reward_points_select_policy ON public.reward_points;
-CREATE POLICY reward_points_select_policy ON public.reward_points
-  FOR SELECT USING (auth.uid() = user_id);
-
--- User can read their own reward points history
-DROP POLICY IF EXISTS reward_points_history_select_policy ON public.reward_points_history;
-CREATE POLICY reward_points_history_select_policy ON public.reward_points_history
-  FOR SELECT USING (auth.uid() = user_id);
-
--- Everyone can see available rewards
-DROP POLICY IF EXISTS rewards_select_policy ON public.rewards;
-CREATE POLICY rewards_select_policy ON public.rewards
-  FOR SELECT USING (true);
+-- Make sure we have a trigger set up
+DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users;
+CREATE TRIGGER on_auth_user_created
+  AFTER INSERT ON auth.users
+  FOR EACH ROW EXECUTE PROCEDURE public.create_profile_for_user();

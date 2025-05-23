@@ -1,4 +1,3 @@
-
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 
@@ -6,15 +5,26 @@ export const authService = {
   // Sign up with email and password
   async signUp(email: string, password: string, userData?: { full_name?: string, phone?: string, username?: string, user_type?: string }) {
     try {
+      // Improved signup flow with client-side validation
+      if (!email || !password) {
+        return { data: null, error: new Error('Email and password are required') };
+      }
+      
       const { data, error } = await supabase.auth.signUp({ 
         email, 
         password,
         options: {
-          data: userData
+          data: userData,
+          emailRedirectTo: `${window.location.origin}/auth?email_confirmed=true`
         }
       });
       
-      return { data, error };
+      if (error) throw error;
+      
+      // Note: We don't need to manually create a profile here
+      // The database trigger will handle this automatically
+      
+      return { data, error: null };
     } catch (error) {
       console.error('Exception during sign up:', error);
       return { data: null, error };
