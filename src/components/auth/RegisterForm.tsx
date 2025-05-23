@@ -42,7 +42,7 @@ const RegisterForm: React.FC<RegisterFormProps> = ({ onSuccess }) => {
   const [resendingEmail, setResendingEmail] = useState<boolean>(false);
   const [showPassword, setShowPassword] = useState<boolean>(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState<boolean>(false);
-  const [duplicateError, setDuplicateError] = useState<{ type: string, message: string } | null>(null);
+  const [formError, setFormError] = useState<{ type: string, message: string } | null>(null);
   const { toast } = useToast();
   const { language } = useLanguage();
   const { signUp } = useAuth();
@@ -60,10 +60,55 @@ const RegisterForm: React.FC<RegisterFormProps> = ({ onSuccess }) => {
     }
   });
 
+  // فحص اسم المستخدم قبل تقديم النموذج
+  const validateUsername = async (username: string) => {
+    try {
+      // قم بالتحقق من خدمة authService إذا كان اسم المستخدم موجودًا بالفعل
+      const authService = (await import('@/services/authService')).default;
+      const { exists, error } = await authService.checkUsernameExists(username);
+      
+      if (error) {
+        console.error("Error checking username:", error);
+        return;
+      }
+      
+      if (exists) {
+        form.setError("username", { 
+          type: "manual", 
+          message: "اسم المستخدم مستخدم بالفعل. يرجى اختيار اسم مستخدم آخر." 
+        });
+        setFormError({
+          type: 'username',
+          message: 'اسم المستخدم مستخدم بالفعل. يرجى اختيار اسم مستخدم آخر.'
+        });
+      } else {
+        form.clearErrors("username");
+        if (formError?.type === 'username') setFormError(null);
+      }
+    } catch (err) {
+      console.error("Error validating username:", err);
+    }
+  };
+
+  // إضافة مستمع لتغييرات اسم المستخدم
+  React.useEffect(() => {
+    const subscription = form.watch((value, { name }) => {
+      if (name === 'username' && value.username && value.username.length >= 3) {
+        const debounceTimeout = setTimeout(() => {
+          validateUsername(value.username as string);
+        }, 500);
+        
+        return () => clearTimeout(debounceTimeout);
+      }
+    });
+    
+    return () => subscription.unsubscribe();
+  }, [form.watch]);
+
   // معالجة تسجيل حساب جديد
   const handleRegister = async (values: z.infer<typeof registerSchema>) => {
     setLoading(true);
-    setDuplicateError(null);
+    setFormError(null);
     
     try {
       // تجهيز البيانات الوصفية مع معالجة الأحرف غير المتوافقة
@@ -80,28 +125,39 @@ const RegisterForm: React.FC<RegisterFormProps> = ({ onSuccess }) => {
       if (error) {
         console.error('Signup error:', error);
         
-        // التحقق من نوع الخطأ وتقديم رسائل مخصصة للمستخدم
+        // تحليل رسالة الخطأ لتحديد نوع الخطأ بدقة
         const errorMessage = error.message || "";
         
-        // التحقق من تكرار البريد الإلكتروني
-        if (errorMessage.includes('email') && errorMessage.includes('already')) {
-          setDuplicateError({
+        if (errorMessage.includes('البريد الإلكتروني مسجل مسبقاً') || 
+            errorMessage.includes('email already') || 
+            errorMessage.includes('already registered')) {
+          setFormError({
             type: 'email',
-            message: 'البريد الإلكتروني مستخدم بالفعل. يرجى استخدام بريد إلكتروني آخر أو تسجيل الدخول.'
+            message: 'البريد الإلكتروني مسجل مسبقاً. يرجى استخدام بريد إلكتروني آخر أو تسجيل الدخول.'
           });
-          throw new Error('البريد الإلكتروني مستخدم بالفعل. يرجى استخدام بريد إلكتروني آخر أو تسجيل الدخول.');
-        }
-        
-        // التحقق من تكرار اسم المستخدم (من خلال خطأ قيود قاعدة البيانات الفريدة)
-        if (errorMessage.includes('duplicate key') && errorMessage.includes('username')) {
-          setDuplicateError({
+          form.setError("email", { 
+            type: "manual", 
+            message: "البريد الإلكتروني مسجل مسبقاً" 
+          });
+        } else if (errorMessage.includes('اسم المستخدم مسجل مسبقاً') || 
+                  errorMessage.includes('username already') || 
+                  errorMessage.includes('username_already_exists')) {
+          setFormError({
             type: 'username',
             message: 'اسم المستخدم مستخدم بالفعل. يرجى اختيار اسم مستخدم آخر.'
           });
-          throw new Error('اسم المستخدم مستخدم بالفعل. يرجى اختيار اسم مستخدم آخر.');
+          form.setError("username", { 
+            type: "manual", 
+            message: "اسم المستخدم مستخدم بالفعل" 
+          });
+        } else {
+          setFormError({
+            type: 'general',
+            message: errorMessage
+          });
         }
         
-        throw error;
+        throw new Error(errorMessage);
       }
       
       // حفظ البريد الإلكتروني للمستخدم المسجل للاستخدام في إعادة الإرسال
@@ -113,16 +169,26 @@ const RegisterForm: React.FC<RegisterFormProps> = ({ onSuccess }) => {
       // إعادة تعيين النموذج بعد نجاح التسجيل
       form.reset();
       
+      // استدعاء function الإبلاغ عن النجاح إذا تم تمريرها
       if (onSuccess) {
         onSuccess();
       }
-    } catch (error: any) {
-      console.error("Registration error:", error);
+      
       toast({
-        title: "فشل إنشاء الحساب",
-        description: error.message || "حدث خطأ أثناء إنشاء الحساب. يرجى المحاولة مرة أخرى.",
-        variant: "destructive",
+        title: "تم إنشاء الحساب بنجاح",
+        description: "تم إرسال رسالة تأكيد إلى بريدك الإلكتروني. يرجى تفعيل حسابك.",
       });
+    } catch (error: any) {
+      console.error("Registration error with details:", error);
+      
+      // إذا لم يتم تعيين خطأ محدد بالفعل
+      if (!formError) {
+        toast({
+          title: "فشل إنشاء الحساب",
+          description: error.message || "حدث خطأ أثناء إنشاء الحساب. يرجى المحاولة مرة أخرى.",
+          variant: "destructive",
+        });
+      }
     } finally {
       setLoading(false);
     }
@@ -136,7 +202,7 @@ const RegisterForm: React.FC<RegisterFormProps> = ({ onSuccess }) => {
     try {
       await resendConfirmationEmail(registeredEmail, toast);
     } catch (error) {
-      console.error("Error resending confirmation:", error);
+      console.error("Error resending confirmation with details:", error);
     } finally {
       setResendingEmail(false);
     }
@@ -179,16 +245,18 @@ const RegisterForm: React.FC<RegisterFormProps> = ({ onSuccess }) => {
         </Alert>
       )}
       
-      {duplicateError && (
+      {formError && (
         <Alert className="mb-6 bg-red-50 dark:bg-red-950 border-red-200 dark:border-red-800">
           <AlertCircle className="h-4 w-4 text-red-600 dark:text-red-400" />
           <AlertTitle className="text-red-600 dark:text-red-400">
-            {duplicateError.type === 'email' 
+            {formError.type === 'email' 
               ? (language === 'ar' ? 'البريد الإلكتروني مستخدم بالفعل' : 'Email already in use')
-              : (language === 'ar' ? 'اسم المستخدم مستخدم بالفعل' : 'Username already taken')}
+              : formError.type === 'username'
+                ? (language === 'ar' ? 'اسم المستخدم مستخدم بالفعل' : 'Username already taken')
+                : (language === 'ar' ? 'خطأ في إنشاء الحساب' : 'Error creating account')}
           </AlertTitle>
           <AlertDescription className="text-red-600 dark:text-red-400">
-            {duplicateError.message}
+            {formError.message}
           </AlertDescription>
         </Alert>
       )}
@@ -311,6 +379,12 @@ const RegisterForm: React.FC<RegisterFormProps> = ({ onSuccess }) => {
                 <Input 
                   placeholder={language === 'ar' ? 'أدخل اسم المستخدم' : 'Enter username'} 
                   className="text-black dark:text-white"
+                  onBlur={(e) => {
+                    field.onBlur();
+                    if (e.target.value.length >= 3) {
+                      validateUsername(e.target.value);
+                    }
+                  }}
                   {...field} 
                 />
               </FormControl>

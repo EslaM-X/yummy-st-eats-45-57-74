@@ -1,106 +1,159 @@
 
--- Updated function to safely handle profile creation with better error handling
+-- تحسين الوظيفة لإنشاء ملف تعريف المستخدم مع معالجة أفضل للأخطاء
 CREATE OR REPLACE FUNCTION public.create_profile_for_user()
 RETURNS trigger
 LANGUAGE plpgsql
 SECURITY DEFINER
 SET search_path TO 'public'
 AS $$
+DECLARE
+  username_count integer;
+  email_count integer;
 BEGIN
-  -- Check if profile already exists to avoid duplicate key error
+  -- فحص ما إذا كان الملف الشخصي موجودًا بالفعل لتجنب خطأ المفتاح المكرر
   IF EXISTS (SELECT 1 FROM public.profiles WHERE id = new.id) THEN
-    -- Profile already exists, don't try to create it again
+    -- الملف الشخصي موجود بالفعل، لا تحاول إنشاءه مرة أخرى
     RETURN new;
   END IF;
 
-  INSERT INTO public.profiles (
-    id, 
-    email, 
-    full_name, 
-    username, 
-    phone, 
-    user_type
-  )
-  VALUES (
-    new.id,
-    new.email,
-    COALESCE(new.raw_user_meta_data->>'full_name', ''),
-    COALESCE(new.raw_user_meta_data->>'username', ''),
-    COALESCE(new.raw_user_meta_data->>'phone', ''),
-    COALESCE(new.raw_user_meta_data->>'user_type', 'customer')
-  );
+  -- التحقق من وجود اسم المستخدم
+  IF new.raw_user_meta_data->>'username' IS NOT NULL THEN
+    SELECT count(*) INTO username_count FROM public.profiles 
+    WHERE username = new.raw_user_meta_data->>'username';
+    
+    IF username_count > 0 THEN
+      RAISE EXCEPTION 'username_already_exists';
+    END IF;
+  END IF;
+
+  -- التحقق من وجود البريد الإلكتروني (إضافي، لأن Supabase يتحقق من ذلك تلقائيًا)
+  IF new.email IS NOT NULL THEN
+    SELECT count(*) INTO email_count FROM auth.users 
+    WHERE email = new.email AND id <> new.id;
+    
+    IF email_count > 0 THEN
+      RAISE EXCEPTION 'email_already_exists';
+    END IF;
+  END IF;
+
+  -- إنشاء الملف الشخصي
+  BEGIN
+    INSERT INTO public.profiles (
+      id, 
+      email, 
+      full_name, 
+      username, 
+      phone, 
+      user_type,
+      created_at,
+      updated_at
+    )
+    VALUES (
+      new.id,
+      new.email,
+      COALESCE(new.raw_user_meta_data->>'full_name', ''),
+      COALESCE(new.raw_user_meta_data->>'username', ''),
+      COALESCE(new.raw_user_meta_data->>'phone', ''),
+      COALESCE(new.raw_user_meta_data->>'user_type', 'customer'),
+      NOW(),
+      NOW()
+    );
+    EXCEPTION
+      WHEN unique_violation THEN
+        -- في حالة حدوث مشكلة تكرارية، تحقق من السبب
+        IF EXISTS (SELECT 1 FROM public.profiles WHERE username = COALESCE(new.raw_user_meta_data->>'username', '')) THEN
+          RAISE EXCEPTION 'username_already_exists';
+        ELSE
+          -- لسبب آخر، فقط استمر - الملف الشخصي موجود بالفعل
+          RETURN new;
+        END IF;
+      WHEN others THEN
+        RAISE LOG 'Error in create_profile_for_user: %, SQLSTATE: %', SQLERRM, SQLSTATE;
+        RETURN new; -- لا تزال تعيد new لعدم منع التسجيل، لكن سجل الخطأ
+  END;
 
   RETURN new;
-EXCEPTION
-  WHEN unique_violation THEN
-    -- In case of race condition, just continue - the profile already exists
-    RETURN new;
-  WHEN others THEN
-    RAISE LOG 'Error in create_profile_for_user: %', SQLERRM;
-    RETURN new; -- Still return new to not block signup, but log the error
 END;
 $$;
 
--- Make sure we have a trigger set up
+-- التأكد من وجود المشغل
 DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users;
 CREATE TRIGGER on_auth_user_created
   AFTER INSERT ON auth.users
   FOR EACH ROW EXECUTE PROCEDURE public.create_profile_for_user();
 
--- Enable RLS on profiles table
+-- تمكين RLS على جدول profiles
 ALTER TABLE public.profiles ENABLE ROW LEVEL SECURITY;
 
--- Drop existing policies if they exist
+-- حذف السياسات الموجودة إن وجدت
 DROP POLICY IF EXISTS "Users can view own profile" ON public.profiles;
 DROP POLICY IF EXISTS "Users can update own profile" ON public.profiles;
 DROP POLICY IF EXISTS "Enable profile creation during signup" ON public.profiles;
 DROP POLICY IF EXISTS "Service role can manage all profiles" ON public.profiles;
 
--- Policy to allow users to view their own profile
+-- سياسة للسماح للمستخدمين بعرض ملفهم الشخصي
 CREATE POLICY "Users can view own profile" ON public.profiles
   FOR SELECT USING (auth.uid() = id);
 
--- Policy to allow users to update their own profile
+-- سياسة للسماح للمستخدمين بتحديث ملفهم الشخصي
 CREATE POLICY "Users can update own profile" ON public.profiles
   FOR UPDATE USING (auth.uid() = id);
 
--- Policy to allow profile creation during signup (this is crucial)
+-- سياسة للسماح بإنشاء الملف الشخصي أثناء التسجيل (هذا أمر حاسم)
 CREATE POLICY "Enable profile creation during signup" ON public.profiles
   FOR INSERT WITH CHECK (auth.uid() = id);
 
--- Policy to allow service role (used by triggers) to insert profiles
+-- سياسة للسماح لدور الخدمة (المستخدم في المشغلات) بإدارة جميع الملفات الشخصية
 CREATE POLICY "Service role can manage all profiles" ON public.profiles
   FOR ALL USING (
-    -- Allow if it's the service role or if it's the user's own profile
+    -- السماح إذا كان دور الخدمة أو إذا كان الملف الشخصي للمستخدم نفسه
     auth.jwt() ->> 'role' = 'service_role' OR auth.uid() = id
   );
 
--- Grant necessary permissions to authenticated users
+-- منح الصلاحيات اللازمة للمستخدمين المصادقين
 GRANT SELECT, UPDATE ON public.profiles TO authenticated;
 GRANT INSERT ON public.profiles TO authenticated;
 
--- Grant permissions to service role for the trigger
+-- منح الصلاحيات لدور الخدمة للمشغل
 GRANT ALL ON public.profiles TO service_role;
 
--- Make sure the profiles table exists with proper structure
-CREATE TABLE IF NOT EXISTS public.profiles (
-  id UUID REFERENCES auth.users(id) ON DELETE CASCADE PRIMARY KEY,
-  email TEXT,
-  full_name TEXT,
-  username TEXT UNIQUE,
-  phone TEXT,
-  address TEXT,
-  avatar_url TEXT,
-  user_type TEXT DEFAULT 'customer' CHECK (user_type IN ('customer', 'restaurant_owner', 'admin')),
-  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-);
+-- التأكد من وجود جدول profiles بهيكل مناسب
+-- تعديل الجدول إذا كان موجودًا
+DO $$
+BEGIN
+  IF EXISTS (SELECT FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'profiles') THEN
+    -- إضافة أعمدة إضافية إذا لم تكن موجودة
+    IF NOT EXISTS (SELECT FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'profiles' AND column_name = 'created_at') THEN
+      ALTER TABLE public.profiles ADD COLUMN created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW();
+    END IF;
+    
+    IF NOT EXISTS (SELECT FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'profiles' AND column_name = 'updated_at') THEN
+      ALTER TABLE public.profiles ADD COLUMN updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW();
+    END IF;
+    
+    -- أي تعديلات إضافية على الجدول...
+  ELSE
+    -- إنشاء الجدول إذا لم يكن موجودًا
+    CREATE TABLE public.profiles (
+      id UUID REFERENCES auth.users(id) ON DELETE CASCADE PRIMARY KEY,
+      email TEXT,
+      full_name TEXT,
+      username TEXT UNIQUE,
+      phone TEXT,
+      address TEXT,
+      avatar_url TEXT,
+      user_type TEXT DEFAULT 'customer' CHECK (user_type IN ('customer', 'restaurant_owner', 'admin')),
+      created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+      updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+    );
+  END IF;
+END$$;
 
--- Create index on email for faster lookups
+-- إنشاء فهارس على البريد الإلكتروني واسم المستخدم لعمليات البحث الأسرع
 CREATE INDEX IF NOT EXISTS profiles_email_idx ON public.profiles(email);
 CREATE INDEX IF NOT EXISTS profiles_username_idx ON public.profiles(username);
 
--- Update trigger for updating the updated_at timestamp
+-- تحديث المشغل لتحديث عمود updated_at
 CREATE OR REPLACE FUNCTION public.update_updated_at_column()
 RETURNS TRIGGER AS $$
 BEGIN
