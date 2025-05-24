@@ -29,6 +29,7 @@ export const useMockRestaurants = (
         const formattedRestaurants: (Restaurant & { country?: string })[] = restaurantsData.map(restaurant => ({
           id: restaurant.id,
           name: restaurant.name,
+          address: restaurant.address || 'عنوان غير محدد', // Add required address property
           cuisine: Array.isArray(restaurant.cuisine_type) 
             ? restaurant.cuisine_type.join(', ')
             : restaurant.cuisine_type || 'مأكولات متنوعة',

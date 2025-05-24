@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -68,31 +69,6 @@ const AdminPendingContent: React.FC = () => {
       // Fetch pending restaurants
       const restaurantsData = await AdminService.getPendingRestaurants();
       const formattedRestaurants: PendingRestaurant[] = restaurantsData.map(restaurant => {
-        // Handle profiles with proper null checking using type guards
-        let profilesData: { id: string; full_name: string; phone: string; email: string; } | null = null;
-        
-        const profiles = restaurant.profiles;
-        if (profiles && 
-            typeof profiles === 'object' && 
-            profiles !== null &&
-            !Array.isArray(profiles) &&
-            !('error' in profiles) &&
-            'id' in profiles &&
-            'full_name' in profiles &&
-            'phone' in profiles &&
-            'email' in profiles &&
-            typeof profiles.id === 'string' &&
-            typeof profiles.full_name === 'string' &&
-            typeof profiles.phone === 'string' &&
-            typeof profiles.email === 'string') {
-          profilesData = {
-            id: profiles.id,
-            full_name: profiles.full_name,
-            phone: profiles.phone,
-            email: profiles.email
-          };
-        }
-
         return {
           id: restaurant.id,
           name: restaurant.name,
@@ -105,7 +81,7 @@ const AdminPendingContent: React.FC = () => {
           owner_id: restaurant.owner_id || undefined,
           status: restaurant.status,
           created_at: restaurant.created_at,
-          profiles: profilesData,
+          profiles: restaurant.profiles || null,
         };
       });
       setPendingRestaurants(formattedRestaurants);
@@ -113,50 +89,6 @@ const AdminPendingContent: React.FC = () => {
       // Fetch pending foods
       const foodsData = await AdminService.getPendingFoods();
       const formattedFoods: PendingFood[] = foodsData.map(food => {
-        // Handle restaurants with proper null checking
-        let restaurantsData: { id: string; name: string; } | null = null;
-        
-        const restaurants = food.restaurants;
-        if (restaurants && 
-            typeof restaurants === 'object' && 
-            restaurants !== null &&
-            !Array.isArray(restaurants) &&
-            !('error' in restaurants) &&
-            'id' in restaurants &&
-            'name' in restaurants &&
-            typeof restaurants.id === 'string' &&
-            typeof restaurants.name === 'string') {
-          restaurantsData = {
-            id: restaurants.id,
-            name: restaurants.name
-          };
-        }
-
-        // Handle profiles with proper null checking using type guards
-        let profilesData: { id: string; full_name: string; phone: string; email: string; } | null = null;
-        
-        const profiles = food.profiles;
-        if (profiles && 
-            typeof profiles === 'object' && 
-            profiles !== null &&
-            !Array.isArray(profiles) &&
-            !('error' in profiles) &&
-            'id' in profiles &&
-            'full_name' in profiles &&
-            'phone' in profiles &&
-            'email' in profiles &&
-            typeof profiles.id === 'string' &&
-            typeof profiles.full_name === 'string' &&
-            typeof profiles.phone === 'string' &&
-            typeof profiles.email === 'string') {
-          profilesData = {
-            id: profiles.id,
-            full_name: profiles.full_name,
-            phone: profiles.phone,
-            email: profiles.email
-          };
-        }
-
         return {
           id: food.id,
           name: food.name,
@@ -168,8 +100,8 @@ const AdminPendingContent: React.FC = () => {
           owner_id: food.owner_id || undefined,
           status: food.status,
           created_at: food.created_at,
-          restaurants: restaurantsData,
-          profiles: profilesData,
+          restaurants: food.restaurants || null,
+          profiles: food.profiles || null,
         };
       });
       setPendingFoods(formattedFoods);

@@ -30,6 +30,7 @@ interface DatabaseRestaurant {
   description?: string;
   address: string; // Required field
   phone?: string;
+  email?: string; // Added email field
   logo_url?: string;
   cuisine_type?: string[];
   avg_rating?: number;
