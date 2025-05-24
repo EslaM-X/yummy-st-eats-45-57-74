@@ -8,7 +8,7 @@ import { useToast } from '@/hooks/use-toast';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { Eye, EyeOff, Lock, User } from 'lucide-react';
 import { useTheme } from '@/components/theme-provider';
-import { supabase } from '@/integrations/supabase/client';
+import { AdminAuthService } from '@/services/AdminAuthService';
 
 const AdminLoginPage: React.FC = () => {
   const [email, setEmail] = useState('');
@@ -23,24 +23,10 @@ const AdminLoginPage: React.FC = () => {
 
   // التحقق من وجود جلسة نشطة
   useEffect(() => {
-    const checkSession = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      
-      if (session) {
-        // التحقق مما إذا كان المستخدم مديرًا
-        const { data: profile, error } = await supabase
-          .from('profiles')
-          .select('user_type')
-          .eq('id', session.user.id)
-          .single();
-        
-        if (!error && profile?.user_type === 'admin') {
-          navigate('/admin');
-        }
-      }
-    };
-    
-    checkSession();
+    const { data } = AdminAuthService.getSession();
+    if (data.session) {
+      navigate('/admin');
+    }
   }, [navigate]);
 
   // استرجاع البريد الإلكتروني المحفوظ
@@ -57,37 +43,13 @@ const AdminLoginPage: React.FC = () => {
     setIsLoading(true);
 
     try {
-      // Clean up any existing auth state
-      clearAuthState();
-      
-      // تسجيل الدخول باستخدام Supabase
-      const { data, error } = await supabase.auth.signInWithPassword({
-        email,
-        password
-      });
+      const { data, error } = await AdminAuthService.signIn(email, password);
 
       if (error) {
-        throw error;
+        throw new Error(error.message);
       }
 
       if (data.session) {
-        // التحقق مما إذا كان المستخدم مديرًا
-        const { data: profile, error: profileError } = await supabase
-          .from('profiles')
-          .select('user_type')
-          .eq('id', data.session.user.id)
-          .single();
-
-        if (profileError) {
-          throw new Error('خطأ في التحقق من صلاحية المستخدم');
-        }
-
-        if (profile?.user_type !== 'admin') {
-          // ليس مديرًا
-          await supabase.auth.signOut(); // تسجيل الخروج
-          throw new Error('ليس لديك صلاحيات المدير');
-        }
-
         // حفظ البريد الإلكتروني إذا تم اختيار "تذكرني"
         if (rememberMe) {
           localStorage.setItem('adminEmail', email);
@@ -115,20 +77,6 @@ const AdminLoginPage: React.FC = () => {
     }
   };
 
-  // تنظيف حالة المصادقة
-  const clearAuthState = () => {
-    Object.keys(localStorage).forEach((key) => {
-      if (key.startsWith('supabase.auth.') || key.includes('sb-')) {
-        localStorage.removeItem(key);
-      }
-    });
-    Object.keys(sessionStorage || {}).forEach((key) => {
-      if (key.startsWith('supabase.auth.') || key.includes('sb-')) {
-        sessionStorage.removeItem(key);
-      }
-    });
-  };
-
   const toggleShowPassword = () => {
     setShowPassword(!showPassword);
   };
@@ -143,6 +91,15 @@ const AdminLoginPage: React.FC = () => {
             </div>
             <CardTitle className="text-2xl font-bold">تسجيل دخول الأدمن</CardTitle>
             <CardDescription className="text-base">يرجى تسجيل الدخول للوصول إلى لوحة الإدارة</CardDescription>
+            
+            {/* عرض بيانات تسجيل الدخول */}
+            <div className="bg-blue-50 dark:bg-blue-900/20 p-4 rounded-lg border border-blue-200 dark:border-blue-800">
+              <h3 className="font-semibold text-blue-800 dark:text-blue-300 mb-2">بيانات تسجيل الدخول:</h3>
+              <div className="text-sm text-blue-700 dark:text-blue-400">
+                <p><strong>البريد الإلكتروني:</strong> admin@steat.app</p>
+                <p><strong>كلمة المرور:</strong> StEat2024!</p>
+              </div>
+            </div>
           </CardHeader>
           <form onSubmit={handleSubmit}>
             <CardContent className="space-y-6">
@@ -158,7 +115,7 @@ const AdminLoginPage: React.FC = () => {
                       type="email"
                       value={email}
                       onChange={(e) => setEmail(e.target.value)}
-                      placeholder="admin@example.com"
+                      placeholder="admin@steat.app"
                       required
                       className={`w-full pr-10 rtl:pr-4 rtl:pl-10 text-black dark:text-white ${theme === 'dark' ? 'bg-gray-800' : 'bg-white'}`}
                     />
@@ -205,9 +162,6 @@ const AdminLoginPage: React.FC = () => {
                   />
                   <label htmlFor="remember-me">تذكرني</label>
                 </div>
-                <a href="#" className="text-teal-600 hover:text-teal-800 dark:text-teal-400 dark:hover:text-teal-300">
-                  نسيت كلمة المرور؟
-                </a>
               </div>
             </CardContent>
             <CardFooter className="flex flex-col gap-4">
