@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -80,7 +79,10 @@ const AdminPendingContent: React.FC = () => {
         owner_id: restaurant.owner_id || undefined,
         status: restaurant.status,
         created_at: restaurant.created_at,
-        profiles: restaurant.profiles && typeof restaurant.profiles === 'object' && !('error' in restaurant.profiles)
+        profiles: restaurant.profiles && 
+                 typeof restaurant.profiles === 'object' && 
+                 !('error' in restaurant.profiles) &&
+                 restaurant.profiles !== null
           ? restaurant.profiles 
           : null,
       }));
@@ -99,10 +101,16 @@ const AdminPendingContent: React.FC = () => {
         owner_id: food.owner_id || undefined,
         status: food.status,
         created_at: food.created_at,
-        restaurants: food.restaurants && typeof food.restaurants === 'object' && !('error' in food.restaurants)
+        restaurants: food.restaurants && 
+                    typeof food.restaurants === 'object' && 
+                    !('error' in food.restaurants) &&
+                    food.restaurants !== null
           ? food.restaurants 
           : null,
-        profiles: food.profiles && typeof food.profiles === 'object' && !('error' in food.profiles)
+        profiles: food.profiles && 
+                 typeof food.profiles === 'object' && 
+                 !('error' in food.profiles) &&
+                 food.profiles !== null
           ? food.profiles 
           : null,
       }));
