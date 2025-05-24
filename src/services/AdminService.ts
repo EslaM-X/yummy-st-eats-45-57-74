@@ -2,68 +2,239 @@
 import { supabase } from '@/integrations/supabase/client';
 
 export interface AdminStats {
-  usersCount: number;
-  ordersCount: number;
-  restaurantsCount: number;
-  totalSales: number;
-  pendingOrders: number;
+  totalOrders: number;
+  totalRevenue: number;
+  totalUsers: number;
+  totalRestaurants: number;
+  newOrdersToday: number;
+  completedOrdersToday: number;
   pendingRestaurants: number;
   pendingFoods: number;
-  activeRestaurants: number;
-  completedOrders: number;
-  totalRefunds: number;
+}
+
+export interface AdminUser {
+  id: string;
+  full_name: string;
+  email: string;
+  phone: string;
+  user_type: 'customer' | 'restaurant_owner' | 'admin';
+  created_at: string;
+  updated_at: string;
+  address?: string;
+  avatar_url?: string;
+}
+
+export interface AdminRestaurant {
+  id: string;
+  name: string;
+  address: string;
+  cuisine_type: string[];
+  is_active: boolean;
+  avg_rating: number;
+  rating_count: number;
+  created_at: string;
+  updated_at: string;
+  logo_url?: string;
+  owner_id: string;
+  phone?: string;
+  description?: string;
+  delivery_fee: number;
+  min_order_amount: number;
+  profiles?: {
+    id: string;
+    full_name: string;
+    phone: string;
+    email: string;
+  };
+}
+
+export interface AdminOrder {
+  id: string;
+  user_id: string;
+  restaurant_id: string;
+  total_amount: number;
+  status: string;
+  payment_method: string;
+  payment_status: string;
+  customer_name?: string;
+  customer_phone?: string;
+  delivery_address?: string;
+  created_at: string;
+  delivered_at?: string;
+  items: any;
+  profiles?: {
+    id: string;
+    full_name: string;
+    phone: string;
+    email: string;
+  };
+  restaurants?: {
+    id: string;
+    name: string;
+    address: string;
+  };
+}
+
+export interface PendingRestaurant {
+  id: string;
+  name: string;
+  description?: string;
+  address?: string;
+  phone?: string;
+  email?: string;
+  cuisine_type?: string;
+  image_url?: string;
+  owner_id?: string;
+  status: string;
+  created_at: string;
+  profiles?: any;
+}
+
+export interface PendingFood {
+  id: string;
+  name: string;
+  description?: string;
+  price: number;
+  category?: string;
+  image_url?: string;
+  restaurant_id?: string;
+  owner_id?: string;
+  status: string;
+  created_at: string;
+  restaurants?: any;
+  profiles?: any;
 }
 
 export class AdminService {
-  // جلب إحصائيات لوحة الإدارة
+  // Dashboard Statistics
   static async getDashboardStats(): Promise<AdminStats> {
     try {
-      const [
-        { count: usersCount },
-        { count: ordersCount },
-        { count: restaurantsCount },
-        { count: activeRestaurants },
-        { data: completedOrdersData },
-        { count: pendingOrders },
-        { count: pendingRestaurants },
-        { count: pendingFoods },
-        { data: refundsData }
-      ] = await Promise.all([
-        supabase.from('profiles').select('*', { count: 'exact', head: true }),
-        supabase.from('orders').select('*', { count: 'exact', head: true }),
-        supabase.from('restaurants').select('*', { count: 'exact', head: true }),
-        supabase.from('restaurants').select('*', { count: 'exact', head: true }).eq('is_active', true),
-        supabase.from('orders').select('total_amount').eq('payment_status', 'completed'),
-        supabase.from('orders').select('*', { count: 'exact', head: true }).eq('status', 'new'),
-        supabase.from('pending_restaurants').select('*', { count: 'exact', head: true }).eq('status', 'pending'),
-        supabase.from('pending_foods').select('*', { count: 'exact', head: true }).eq('status', 'pending'),
-        supabase.from('refund_transactions').select('amount').eq('status', 'completed')
-      ]);
+      const today = new Date().toISOString().split('T')[0];
+      
+      // احصائيات الطلبات
+      const { data: orders } = await supabase
+        .from('orders')
+        .select('total_amount, status, created_at');
+      
+      const totalOrders = orders?.length || 0;
+      const totalRevenue = orders?.reduce((sum, order) => sum + (order.total_amount || 0), 0) || 0;
+      
+      const todayOrders = orders?.filter(order => 
+        order.created_at.startsWith(today)
+      ) || [];
+      
+      const newOrdersToday = todayOrders.filter(order => 
+        order.status === 'new'
+      ).length;
+      
+      const completedOrdersToday = todayOrders.filter(order => 
+        order.status === 'completed'
+      ).length;
 
-      const totalSales = completedOrdersData?.reduce((sum, order) => sum + (order.total_amount || 0), 0) || 0;
-      const totalRefunds = refundsData?.reduce((sum, refund) => sum + (refund.amount || 0), 0) || 0;
-      const completedOrders = completedOrdersData?.length || 0;
+      // احصائيات المستخدمين
+      const { count: totalUsers } = await supabase
+        .from('profiles')
+        .select('*', { count: 'exact', head: true });
+
+      // احصائيات المطاعم
+      const { count: totalRestaurants } = await supabase
+        .from('restaurants')
+        .select('*', { count: 'exact', head: true });
+
+      // المطاعم المعلقة
+      const { count: pendingRestaurants } = await supabase
+        .from('pending_restaurants')
+        .select('*', { count: 'exact', head: true })
+        .eq('status', 'pending');
+
+      // الأطعمة المعلقة
+      const { count: pendingFoods } = await supabase
+        .from('pending_foods')
+        .select('*', { count: 'exact', head: true })
+        .eq('status', 'pending');
 
       return {
-        usersCount: usersCount || 0,
-        ordersCount: ordersCount || 0,
-        restaurantsCount: restaurantsCount || 0,
-        activeRestaurants: activeRestaurants || 0,
-        totalSales,
-        pendingOrders: pendingOrders || 0,
+        totalOrders,
+        totalRevenue,
+        totalUsers: totalUsers || 0,
+        totalRestaurants: totalRestaurants || 0,
+        newOrdersToday,
+        completedOrdersToday,
         pendingRestaurants: pendingRestaurants || 0,
         pendingFoods: pendingFoods || 0,
-        completedOrders,
-        totalRefunds,
       };
     } catch (error) {
-      console.error('Error fetching admin stats:', error);
+      console.error('Error fetching dashboard stats:', error);
+      return {
+        totalOrders: 0,
+        totalRevenue: 0,
+        totalUsers: 0,
+        totalRestaurants: 0,
+        newOrdersToday: 0,
+        completedOrdersToday: 0,
+        pendingRestaurants: 0,
+        pendingFoods: 0,
+      };
+    }
+  }
+
+  // Orders Management
+  static async getAllOrders(): Promise<AdminOrder[]> {
+    try {
+      const { data, error } = await supabase
+        .from('orders')
+        .select(`
+          *,
+          profiles:user_id (
+            id,
+            full_name,
+            phone,
+            email
+          ),
+          restaurants:restaurant_id (
+            id,
+            name,
+            address
+          )
+        `)
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+      return data || [];
+    } catch (error) {
+      console.error('Error fetching orders:', error);
+      return [];
+    }
+  }
+
+  static async updateOrderStatus(orderId: string, status: string): Promise<void> {
+    try {
+      const { error } = await supabase
+        .from('orders')
+        .update({ 
+          status,
+          delivered_at: status === 'completed' ? new Date().toISOString() : null
+        })
+        .eq('id', orderId);
+
+      if (error) throw error;
+
+      // إضافة سجل تتبع
+      await supabase
+        .from('order_tracking')
+        .insert({
+          order_id: orderId,
+          status,
+          notes: `تم تحديث حالة الطلب إلى ${status}`
+        });
+    } catch (error) {
+      console.error('Error updating order status:', error);
       throw error;
     }
   }
 
-  // جلب جميع المستخدمين مع تفاصيلهم
-  static async getAllUsers() {
+  // Users Management
+  static async getAllUsers(): Promise<AdminUser[]> {
     try {
       const { data, error } = await supabase
         .from('profiles')
@@ -74,60 +245,33 @@ export class AdminService {
       return data || [];
     } catch (error) {
       console.error('Error fetching users:', error);
-      throw error;
+      return [];
     }
   }
 
-  // جلب جميع الطلبات مع تفاصيل العملاء والمطاعم
-  static async getAllOrders() {
+  static async deleteUser(userId: string): Promise<void> {
     try {
-      const { data, error } = await supabase
-        .from('orders')
-        .select(`
-          *,
-          profiles!orders_user_id_fkey(id, full_name, phone, email),
-          restaurants!orders_restaurant_id_fkey(id, name, address, phone)
-        `)
-        .order('created_at', { ascending: false });
-
+      const { error } = await supabase.auth.admin.deleteUser(userId);
       if (error) throw error;
-      return data || [];
     } catch (error) {
-      console.error('Error fetching orders:', error);
+      console.error('Error deleting user:', error);
       throw error;
     }
   }
 
-  // تحديث حالة الطلب
-  static async updateOrderStatus(orderId: string, status: string) {
-    try {
-      const { data, error } = await supabase
-        .from('orders')
-        .update({ 
-          status, 
-          updated_at: new Date().toISOString(),
-          ...(status === 'completed' ? { delivered_at: new Date().toISOString() } : {})
-        })
-        .eq('id', orderId)
-        .select()
-        .single();
-
-      if (error) throw error;
-      return data;
-    } catch (error) {
-      console.error('Error updating order status:', error);
-      throw error;
-    }
-  }
-
-  // جلب جميع المطاعم مع تفاصيل أصحابها
-  static async getAllRestaurants() {
+  // Restaurants Management
+  static async getAllRestaurants(): Promise<AdminRestaurant[]> {
     try {
       const { data, error } = await supabase
         .from('restaurants')
         .select(`
           *,
-          profiles!restaurants_owner_id_fkey(id, full_name, phone, email)
+          profiles:owner_id (
+            id,
+            full_name,
+            phone,
+            email
+          )
         `)
         .order('created_at', { ascending: false });
 
@@ -135,33 +279,25 @@ export class AdminService {
       return data || [];
     } catch (error) {
       console.error('Error fetching restaurants:', error);
-      throw error;
+      return [];
     }
   }
 
-  // تفعيل/إلغاء تفعيل مطعم
-  static async toggleRestaurantStatus(restaurantId: string, isActive: boolean) {
+  static async toggleRestaurantStatus(restaurantId: string, isActive: boolean): Promise<void> {
     try {
-      const { data, error } = await supabase
+      const { error } = await supabase
         .from('restaurants')
-        .update({ 
-          is_active: isActive, 
-          updated_at: new Date().toISOString() 
-        })
-        .eq('id', restaurantId)
-        .select()
-        .single();
+        .update({ is_active: isActive })
+        .eq('id', restaurantId);
 
       if (error) throw error;
-      return data;
     } catch (error) {
-      console.error('Error toggling restaurant status:', error);
+      console.error('Error updating restaurant status:', error);
       throw error;
     }
   }
 
-  // حذف مطعم
-  static async deleteRestaurant(restaurantId: string) {
+  static async deleteRestaurant(restaurantId: string): Promise<void> {
     try {
       const { error } = await supabase
         .from('restaurants')
@@ -169,21 +305,25 @@ export class AdminService {
         .eq('id', restaurantId);
 
       if (error) throw error;
-      return true;
     } catch (error) {
       console.error('Error deleting restaurant:', error);
       throw error;
     }
   }
 
-  // جلب المطاعم المعلقة للموافقة
-  static async getPendingRestaurants() {
+  // Pending Content Management
+  static async getPendingRestaurants(): Promise<PendingRestaurant[]> {
     try {
       const { data, error } = await supabase
         .from('pending_restaurants')
         .select(`
           *,
-          profiles!pending_restaurants_owner_id_fkey(id, full_name, phone, email)
+          profiles:owner_id (
+            id,
+            full_name,
+            phone,
+            email
+          )
         `)
         .eq('status', 'pending')
         .order('created_at', { ascending: false });
@@ -192,97 +332,26 @@ export class AdminService {
       return data || [];
     } catch (error) {
       console.error('Error fetching pending restaurants:', error);
-      throw error;
+      return [];
     }
   }
 
-  // الموافقة على مطعم معلق
-  static async approveRestaurant(pendingId: string, adminNotes?: string) {
-    try {
-      // جلب بيانات المطعم المعلق
-      const { data: pendingRestaurant, error: fetchError } = await supabase
-        .from('pending_restaurants')
-        .select('*')
-        .eq('id', pendingId)
-        .single();
-
-      if (fetchError) throw fetchError;
-
-      // إنشاء المطعم في جدول المطاعم الرئيسي
-      const { data: restaurant, error: insertError } = await supabase
-        .from('restaurants')
-        .insert({
-          name: pendingRestaurant.name,
-          description: pendingRestaurant.description || '',
-          address: pendingRestaurant.address || '',
-          phone: pendingRestaurant.phone,
-          logo_url: pendingRestaurant.image_url,
-          cuisine_type: pendingRestaurant.cuisine_type ? [pendingRestaurant.cuisine_type] : [],
-          owner_id: pendingRestaurant.owner_id,
-          is_active: true,
-          rating: 0,
-          avg_rating: 0,
-          rating_count: 0,
-          delivery_fee: 0,
-          min_order_amount: 0
-        })
-        .select()
-        .single();
-
-      if (insertError) throw insertError;
-
-      // تحديث حالة المطعم المعلق
-      const { error: updateError } = await supabase
-        .from('pending_restaurants')
-        .update({
-          status: 'approved',
-          admin_notes: adminNotes,
-          reviewed_at: new Date().toISOString(),
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', pendingId);
-
-      if (updateError) throw updateError;
-
-      return restaurant;
-    } catch (error) {
-      console.error('Error approving restaurant:', error);
-      throw error;
-    }
-  }
-
-  // رفض مطعم معلق
-  static async rejectRestaurant(pendingId: string, adminNotes: string) {
-    try {
-      const { data, error } = await supabase
-        .from('pending_restaurants')
-        .update({
-          status: 'rejected',
-          admin_notes: adminNotes,
-          reviewed_at: new Date().toISOString(),
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', pendingId)
-        .select()
-        .single();
-
-      if (error) throw error;
-      return data;
-    } catch (error) {
-      console.error('Error rejecting restaurant:', error);
-      throw error;
-    }
-  }
-
-  // جلب الأطعمة المعلقة للموافقة
-  static async getPendingFoods() {
+  static async getPendingFoods(): Promise<PendingFood[]> {
     try {
       const { data, error } = await supabase
         .from('pending_foods')
         .select(`
           *,
-          restaurants!pending_foods_restaurant_id_fkey(id, name),
-          profiles!pending_foods_owner_id_fkey(id, full_name, phone, email)
+          restaurants:restaurant_id (
+            id,
+            name
+          ),
+          profiles:owner_id (
+            id,
+            full_name,
+            phone,
+            email
+          )
         `)
         .eq('status', 'pending')
         .order('created_at', { ascending: false });
@@ -291,164 +360,273 @@ export class AdminService {
       return data || [];
     } catch (error) {
       console.error('Error fetching pending foods:', error);
+      return [];
+    }
+  }
+
+  static async approveRestaurant(restaurantId: string, notes: string = ''): Promise<void> {
+    try {
+      // الحصول على بيانات المطعم المعلق
+      const { data: pendingRestaurant, error: fetchError } = await supabase
+        .from('pending_restaurants')
+        .select('*')
+        .eq('id', restaurantId)
+        .single();
+
+      if (fetchError || !pendingRestaurant) throw fetchError;
+
+      // إنشاء المطعم في الجدول الرئيسي
+      const { error: insertError } = await supabase
+        .from('restaurants')
+        .insert({
+          name: pendingRestaurant.name,
+          description: pendingRestaurant.description,
+          address: pendingRestaurant.address,
+          phone: pendingRestaurant.phone,
+          cuisine_type: pendingRestaurant.cuisine_type ? [pendingRestaurant.cuisine_type] : [],
+          logo_url: pendingRestaurant.image_url,
+          owner_id: pendingRestaurant.owner_id,
+          is_active: true
+        });
+
+      if (insertError) throw insertError;
+
+      // تحديث حالة الطلب
+      const { error: updateError } = await supabase
+        .from('pending_restaurants')
+        .update({
+          status: 'approved',
+          admin_notes: notes,
+          reviewed_at: new Date().toISOString()
+        })
+        .eq('id', restaurantId);
+
+      if (updateError) throw updateError;
+
+      // إرسال إشعار للمالك
+      if (pendingRestaurant.owner_id) {
+        await supabase
+          .from('notifications')
+          .insert({
+            user_id: pendingRestaurant.owner_id,
+            notification_type: 'approval',
+            title: 'تمت الموافقة على مطعمك',
+            message: `تمت الموافقة على مطعم ${pendingRestaurant.name} وأصبح نشطاً الآن`,
+            reference_id: restaurantId
+          });
+      }
+    } catch (error) {
+      console.error('Error approving restaurant:', error);
       throw error;
     }
   }
 
-  // الموافقة على طعام معلق
-  static async approveFood(pendingId: string, adminNotes?: string) {
+  static async rejectRestaurant(restaurantId: string, notes: string = ''): Promise<void> {
     try {
-      // جلب بيانات الطعام المعلق
+      const { data: pendingRestaurant } = await supabase
+        .from('pending_restaurants')
+        .select('name, owner_id')
+        .eq('id', restaurantId)
+        .single();
+
+      const { error } = await supabase
+        .from('pending_restaurants')
+        .update({
+          status: 'rejected',
+          admin_notes: notes,
+          reviewed_at: new Date().toISOString()
+        })
+        .eq('id', restaurantId);
+
+      if (error) throw error;
+
+      // إرسال إشعار للمالك
+      if (pendingRestaurant?.owner_id) {
+        await supabase
+          .from('notifications')
+          .insert({
+            user_id: pendingRestaurant.owner_id,
+            notification_type: 'approval',
+            title: 'تم رفض طلب المطعم',
+            message: `تم رفض طلب مطعم ${pendingRestaurant.name}. ${notes}`,
+            reference_id: restaurantId
+          });
+      }
+    } catch (error) {
+      console.error('Error rejecting restaurant:', error);
+      throw error;
+    }
+  }
+
+  static async approveFood(foodId: string, notes: string = ''): Promise<void> {
+    try {
       const { data: pendingFood, error: fetchError } = await supabase
         .from('pending_foods')
         .select('*')
-        .eq('id', pendingId)
+        .eq('id', foodId)
         .single();
 
-      if (fetchError) throw fetchError;
+      if (fetchError || !pendingFood) throw fetchError;
 
-      // إنشاء المنتج في جدول المنتجات الرئيسي
-      const { data: product, error: insertError } = await supabase
+      // إنشاء المنتج في الجدول الرئيسي
+      const { error: insertError } = await supabase
         .from('products')
         .insert({
           name: pendingFood.name,
-          description: pendingFood.description || '',
+          description: pendingFood.description,
           price: pendingFood.price,
           image: pendingFood.image_url,
           restaurant_id: pendingFood.restaurant_id,
           available: true,
-          featured: false,
-          category_id: null
-        })
-        .select()
-        .single();
+          featured: false
+        });
 
       if (insertError) throw insertError;
 
-      // تحديث حالة الطعام المعلق
+      // تحديث حالة الطلب
       const { error: updateError } = await supabase
         .from('pending_foods')
         .update({
           status: 'approved',
-          admin_notes: adminNotes,
-          reviewed_at: new Date().toISOString(),
-          updated_at: new Date().toISOString()
+          admin_notes: notes,
+          reviewed_at: new Date().toISOString()
         })
-        .eq('id', pendingId);
+        .eq('id', foodId);
 
       if (updateError) throw updateError;
 
-      return product;
+      // إرسال إشعار للمالك
+      if (pendingFood.owner_id) {
+        await supabase
+          .from('notifications')
+          .insert({
+            user_id: pendingFood.owner_id,
+            notification_type: 'approval',
+            title: 'تمت الموافقة على منتجك',
+            message: `تمت الموافقة على منتج ${pendingFood.name} وأصبح متاحاً الآن`,
+            reference_id: foodId
+          });
+      }
     } catch (error) {
       console.error('Error approving food:', error);
       throw error;
     }
   }
 
-  // رفض طعام معلق
-  static async rejectFood(pendingId: string, adminNotes: string) {
+  static async rejectFood(foodId: string, notes: string = ''): Promise<void> {
     try {
-      const { data, error } = await supabase
+      const { data: pendingFood } = await supabase
+        .from('pending_foods')
+        .select('name, owner_id')
+        .eq('id', foodId)
+        .single();
+
+      const { error } = await supabase
         .from('pending_foods')
         .update({
           status: 'rejected',
-          admin_notes: adminNotes,
-          reviewed_at: new Date().toISOString(),
-          updated_at: new Date().toISOString()
+          admin_notes: notes,
+          reviewed_at: new Date().toISOString()
         })
-        .eq('id', pendingId)
-        .select()
-        .single();
+        .eq('id', foodId);
 
       if (error) throw error;
-      return data;
+
+      // إرسال إشعار للمالك
+      if (pendingFood?.owner_id) {
+        await supabase
+          .from('notifications')
+          .insert({
+            user_id: pendingFood.owner_id,
+            notification_type: 'approval',
+            title: 'تم رفض طلب المنتج',
+            message: `تم رفض طلب منتج ${pendingFood.name}. ${notes}`,
+            reference_id: foodId
+          });
+      }
     } catch (error) {
       console.error('Error rejecting food:', error);
       throw error;
     }
   }
 
-  // تحديث معلومات المستخدم
-  static async updateUser(userId: string, updates: any) {
+  // Sales and Analytics
+  static async getSalesData(period: string = '7days') {
     try {
-      const { data, error } = await supabase
-        .from('profiles')
-        .update({ ...updates, updated_at: new Date().toISOString() })
-        .eq('id', userId)
-        .select()
-        .single();
-
-      if (error) throw error;
-      return data;
-    } catch (error) {
-      console.error('Error updating user:', error);
-      throw error;
-    }
-  }
-
-  // حذف مستخدم
-  static async deleteUser(userId: string) {
-    try {
-      const { error } = await supabase
-        .from('profiles')
-        .delete()
-        .eq('id', userId);
-
-      if (error) throw error;
-      return true;
-    } catch (error) {
-      console.error('Error deleting user:', error);
-      throw error;
-    }
-  }
-
-  // جلب إحصائيات المبيعات حسب الفترة
-  static async getSalesData(period: 'week' | 'month' | 'year' = 'week') {
-    try {
-      let dateFrom = new Date();
-      
-      switch (period) {
-        case 'week':
-          dateFrom.setDate(dateFrom.getDate() - 7);
-          break;
-        case 'month':
-          dateFrom.setMonth(dateFrom.getMonth() - 1);
-          break;
-        case 'year':
-          dateFrom.setFullYear(dateFrom.getFullYear() - 1);
-          break;
-      }
+      const days = period === '7days' ? 7 : 30;
+      const startDate = new Date();
+      startDate.setDate(startDate.getDate() - days);
 
       const { data, error } = await supabase
         .from('orders')
-        .select('total_amount, created_at, payment_status')
-        .eq('payment_status', 'completed')
-        .gte('created_at', dateFrom.toISOString())
+        .select('total_amount, created_at, status')
+        .gte('created_at', startDate.toISOString())
+        .eq('status', 'completed')
         .order('created_at', { ascending: true });
 
       if (error) throw error;
-      return data || [];
+
+      // تجميع البيانات حسب التاريخ
+      const salesByDate = (data || []).reduce((acc: any, order) => {
+        const date = order.created_at.split('T')[0];
+        if (!acc[date]) {
+          acc[date] = { date, sales: 0, orders: 0 };
+        }
+        acc[date].sales += order.total_amount;
+        acc[date].orders += 1;
+        return acc;
+      }, {});
+
+      return Object.values(salesByDate);
     } catch (error) {
       console.error('Error fetching sales data:', error);
-      throw error;
+      return [];
     }
   }
 
-  // جلب أفضل المطاعم حسب التقييم
-  static async getTopRestaurants(limit: number = 5) {
+  static async getTopRestaurants() {
     try {
       const { data, error } = await supabase
         .from('restaurants')
-        .select('id, name, avg_rating, rating_count, logo_url')
+        .select(`
+          id,
+          name,
+          avg_rating,
+          rating_count,
+          logo_url
+        `)
         .eq('is_active', true)
         .order('avg_rating', { ascending: false })
-        .limit(limit);
+        .limit(5);
 
       if (error) throw error;
       return data || [];
     } catch (error) {
       console.error('Error fetching top restaurants:', error);
-      throw error;
+      return [];
+    }
+  }
+
+  static async getRecentOrders() {
+    try {
+      const { data, error } = await supabase
+        .from('orders')
+        .select(`
+          id,
+          total_amount,
+          status,
+          created_at,
+          customer_name,
+          restaurants:restaurant_id (name)
+        `)
+        .order('created_at', { ascending: false })
+        .limit(10);
+
+      if (error) throw error;
+      return data || [];
+    } catch (error) {
+      console.error('Error fetching recent orders:', error);
+      return [];
     }
   }
 }
