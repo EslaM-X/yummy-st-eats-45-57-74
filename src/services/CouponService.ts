@@ -4,7 +4,9 @@ import { supabase } from '@/integrations/supabase/client';
 export interface Coupon {
   id: string;
   title: string;
+  title_en?: string;
   description?: string;
+  description_en?: string;
   discount_type: 'percentage' | 'fixed_amount';
   discount_value: number;
   minimum_order: number;
@@ -38,7 +40,9 @@ export class CouponService {
         {
           id: '1',
           title: 'خصم 20% على الطلب الأول',
+          title_en: '20% OFF First Order',
           description: 'احصل على خصم 20% على طلبك الأول من أي مطعم',
+          description_en: 'Get 20% off your first order from any restaurant',
           discount_type: 'percentage',
           discount_value: 20,
           minimum_order: 50,
@@ -52,7 +56,9 @@ export class CouponService {
         {
           id: '2',
           title: 'خصم 15 ST',
+          title_en: '15 ST Discount',
           description: 'خصم 15 ST على الطلبات التي تزيد عن 100 ST',
+          description_en: '15 ST discount on orders over 100 ST',
           discount_type: 'fixed_amount',
           discount_value: 15,
           minimum_order: 100,
@@ -66,7 +72,9 @@ export class CouponService {
         {
           id: '3',
           title: 'خصم 10% للعملاء المميزين',
+          title_en: '10% OFF for VIP Customers',
           description: 'خصم خاص للعملاء الذين أكملوا أكثر من 5 طلبات',
+          description_en: 'Special discount for customers who completed more than 5 orders',
           discount_type: 'percentage',
           discount_value: 10,
           minimum_order: 30,
@@ -99,7 +107,9 @@ export class CouponService {
           coupon: {
             id: '1',
             title: 'خصم 20% على الطلب الأول',
+            title_en: '20% OFF First Order',
             description: 'احصل على خصم 20% على طلبك الأول من أي مطعم',
+            description_en: 'Get 20% off your first order from any restaurant',
             discount_type: 'percentage',
             discount_value: 20,
             minimum_order: 50,
