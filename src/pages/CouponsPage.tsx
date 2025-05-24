@@ -16,7 +16,7 @@ import { Badge } from "@/components/ui/badge";
 const CouponsPage: React.FC = () => {
   const { user, isAuthenticated, isLoading } = useAuth();
   const { toast } = useToast();
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
   const [activeTab, setActiveTab] = useState<string>("available");
   const [availableCoupons, setAvailableCoupons] = useState<Coupon[]>([]);
   const [userCoupons, setUserCoupons] = useState<UserCoupon[]>([]);
@@ -41,8 +41,8 @@ const CouponsPage: React.FC = () => {
       } catch (error) {
         console.error('Error fetching coupons data:', error);
         toast({
-          title: 'خطأ',
-          description: 'حدث خطأ في تحميل الكوبونات',
+          title: t('error'),
+          description: t('error_loading'),
           variant: "destructive",
         });
       } finally {
@@ -51,7 +51,7 @@ const CouponsPage: React.FC = () => {
     };
     
     fetchCouponsData();
-  }, [isAuthenticated, isLoading, user, toast]);
+  }, [isAuthenticated, isLoading, user, toast, t]);
 
   // Handle coupon claim
   const handleClaimCoupon = async (coupon: Coupon) => {
@@ -66,21 +66,21 @@ const CouponsPage: React.FC = () => {
         setUserCoupons(userCouponsData);
         
         toast({
-          title: 'تم الحصول على الكوبون',
-          description: `تم إضافة كوبون "${coupon.title}" إلى حسابك`,
+          title: t('coupon_claimed'),
+          description: t('coupon_claimed_description').replace('{title}', coupon.title),
         });
       } else {
         toast({
-          title: 'فشل في الحصول على الكوبون',
-          description: 'حدث خطأ أثناء محاولة الحصول على الكوبون',
+          title: t('coupon_claim_failed'),
+          description: t('coupon_claim_failed_description'),
           variant: "destructive",
         });
       }
     } catch (error) {
       console.error('Error claiming coupon:', error);
       toast({
-        title: 'خطأ',
-        description: 'حدث خطأ غير متوقع',
+        title: t('error'),
+        description: t('coupon_claim_failed_description'),
         variant: "destructive",
       });
     }
@@ -124,14 +124,14 @@ const CouponsPage: React.FC = () => {
             </div>
             <div className="bg-gradient-to-r from-orange-600 to-yellow-600 bg-clip-text text-transparent">
               <h1 className="text-5xl font-bold mb-6 relative">
-                كوبونات الخصم الحصرية
+                {t('page_title')}
                 <div className="absolute -top-2 -right-2">
                   <Trophy className="h-6 w-6 text-yellow-500 animate-bounce" />
                 </div>
               </h1>
             </div>
             <p className="text-xl text-gray-600 dark:text-gray-300 max-w-2xl mx-auto leading-relaxed">
-              استمتع بأفضل العروض والخصومات الحصرية على طلباتك المفضلة
+              {t('page_subtitle')}
             </p>
             <div className="flex justify-center mt-6">
               <div className="flex space-x-2 rtl:space-x-reverse">
@@ -147,9 +147,9 @@ const CouponsPage: React.FC = () => {
           {!isAuthenticated && (
             <Alert className="max-w-md mx-auto mb-12 border-orange-200 bg-orange-50 dark:bg-orange-950/20">
               <AlertCircle className="h-4 w-4 text-orange-600" />
-              <AlertTitle className="text-orange-800 dark:text-orange-200">تسجيل الدخول مطلوب</AlertTitle>
+              <AlertTitle className="text-orange-800 dark:text-orange-200">{t('login_required')}</AlertTitle>
               <AlertDescription className="text-orange-700 dark:text-orange-300">
-                يجب تسجيل الدخول للحصول على الكوبونات واستخدامها
+                {t('login_required_description')}
               </AlertDescription>
             </Alert>
           )}
@@ -161,7 +161,7 @@ const CouponsPage: React.FC = () => {
                 className="flex-1 data-[state=active]:bg-gradient-to-r data-[state=active]:from-orange-500 data-[state=active]:to-yellow-500 data-[state=active]:text-white"
               >
                 <Tag className="h-4 w-4 mr-2" />
-                الكوبونات المتاحة
+                {t('available_coupons')}
               </TabsTrigger>
               {isAuthenticated && (
                 <TabsTrigger 
@@ -169,7 +169,7 @@ const CouponsPage: React.FC = () => {
                   className="flex-1 data-[state=active]:bg-gradient-to-r data-[state=active]:from-green-500 data-[state=active]:to-emerald-500 data-[state=active]:text-white"
                 >
                   <Gift className="h-4 w-4 mr-2" />
-                  كوبوناتي
+                  {t('my_coupons')}
                 </TabsTrigger>
               )}
             </TabsList>
@@ -179,7 +179,7 @@ const CouponsPage: React.FC = () => {
                 <div className="flex justify-center p-16">
                   <div className="text-center">
                     <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-orange-500 mx-auto mb-4"></div>
-                    <p className="text-gray-600 dark:text-gray-400">جاري تحميل الكوبونات...</p>
+                    <p className="text-gray-600 dark:text-gray-400">{t('loading_coupons')}</p>
                   </div>
                 </div>
               ) : (
@@ -228,19 +228,19 @@ const CouponsPage: React.FC = () => {
                           {coupon.minimum_order > 0 && (
                             <div className="flex items-center text-sm bg-white/60 dark:bg-gray-800/60 rounded-lg p-3">
                               <DollarSign className="h-4 w-4 mr-2 text-orange-500" />
-                              <span>الحد الأدنى للطلب: <strong>{coupon.minimum_order} ST</strong></span>
+                              <span>{t('minimum_order')}: <strong>{coupon.minimum_order} ST</strong></span>
                             </div>
                           )}
                           {coupon.max_uses && (
                             <div className="flex items-center text-sm bg-white/60 dark:bg-gray-800/60 rounded-lg p-3">
                               <Tag className="h-4 w-4 mr-2 text-blue-500" />
-                              <span>متبقي: <strong>{coupon.max_uses - coupon.used_count}</strong> استخدام</span>
+                              <span>{t('remaining')}: <strong>{coupon.max_uses - coupon.used_count}</strong> {t('uses')}</span>
                             </div>
                           )}
                           {coupon.expires_at && (
                             <div className="flex items-center text-sm bg-white/60 dark:bg-gray-800/60 rounded-lg p-3">
                               <Clock className="h-4 w-4 mr-2 text-red-500" />
-                              <span>ينتهي: <strong>{new Date(coupon.expires_at).toLocaleDateString('ar')}</strong></span>
+                              <span>{t('expires')}: <strong>{new Date(coupon.expires_at).toLocaleDateString(language === 'ar' ? 'ar' : 'en')}</strong></span>
                             </div>
                           )}
                         </div>
@@ -256,10 +256,10 @@ const CouponsPage: React.FC = () => {
                           onClick={() => handleClaimCoupon(coupon)}
                         >
                           {!isAuthenticated 
-                            ? '🔐 سجل دخولك أولاً' 
+                            ? t('login_first')
                             : userHasCoupon(coupon.id) 
-                            ? '✅ تم الحصول عليه' 
-                            : '🎁 احصل على الكوبون'
+                            ? t('already_claimed')
+                            : t('get_coupon')
                           }
                         </Button>
                       </CardFooter>
@@ -275,7 +275,7 @@ const CouponsPage: React.FC = () => {
                   <div className="flex justify-center p-16">
                     <div className="text-center">
                       <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-green-500 mx-auto mb-4"></div>
-                      <p className="text-gray-600 dark:text-gray-400">جاري تحميل كوبوناتك...</p>
+                      <p className="text-gray-600 dark:text-gray-400">{t('loading_my_coupons')}</p>
                     </div>
                   </div>
                 ) : userCoupons.length > 0 ? (
@@ -308,20 +308,20 @@ const CouponsPage: React.FC = () => {
                             {userCoupon.coupon?.minimum_order && userCoupon.coupon.minimum_order > 0 && (
                               <div className="flex items-center text-sm bg-white/60 dark:bg-gray-800/60 rounded-lg p-3">
                                 <DollarSign className="h-4 w-4 mr-2 text-green-500" />
-                                <span>الحد الأدنى للطلب: <strong>{userCoupon.coupon.minimum_order} ST</strong></span>
+                                <span>{t('minimum_order')}: <strong>{userCoupon.coupon.minimum_order} ST</strong></span>
                               </div>
                             )}
                             {userCoupon.coupon?.expires_at && (
                               <div className="flex items-center text-sm bg-white/60 dark:bg-gray-800/60 rounded-lg p-3">
                                 <Clock className="h-4 w-4 mr-2 text-orange-500" />
-                                <span>ينتهي: <strong>{new Date(userCoupon.coupon.expires_at).toLocaleDateString('ar')}</strong></span>
+                                <span>{t('expires')}: <strong>{new Date(userCoupon.coupon.expires_at).toLocaleDateString(language === 'ar' ? 'ar' : 'en')}</strong></span>
                               </div>
                             )}
                             <Badge 
                               variant="outline" 
                               className="w-full justify-center text-green-600 border-green-500 bg-green-50 dark:bg-green-950/20 py-2"
                             >
-                              ✨ جاهز للاستخدام
+                              {t('ready_to_use')}
                             </Badge>
                           </div>
                         </CardContent>
@@ -333,15 +333,15 @@ const CouponsPage: React.FC = () => {
                     <div className="bg-gradient-to-br from-orange-100 to-yellow-100 dark:from-orange-900/20 dark:to-yellow-900/20 rounded-full w-32 h-32 flex items-center justify-center mx-auto mb-8">
                       <Gift className="h-16 w-16 text-orange-500" />
                     </div>
-                    <h3 className="text-2xl font-bold mb-4 text-gray-800 dark:text-gray-200">لا توجد كوبونات بعد</h3>
+                    <h3 className="text-2xl font-bold mb-4 text-gray-800 dark:text-gray-200">{t('no_my_coupons')}</h3>
                     <p className="text-lg text-gray-600 dark:text-gray-400 mb-8 max-w-md mx-auto">
-                      لم تحصل على أي كوبونات بعد. تصفح الكوبونات المتاحة واحصل عليها!
+                      {t('no_my_coupons_description')}
                     </p>
                     <Button 
                       onClick={() => setActiveTab('available')}
                       className="bg-gradient-to-r from-orange-500 to-yellow-500 hover:from-orange-600 hover:to-yellow-600 text-white px-8 py-3 text-lg"
                     >
-                      تصفح الكوبونات المتاحة
+                      {t('browse_available')}
                     </Button>
                   </div>
                 )}

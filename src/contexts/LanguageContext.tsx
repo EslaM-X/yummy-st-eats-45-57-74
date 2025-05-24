@@ -13,6 +13,7 @@ import enRestaurants from '@/locales/en/restaurants.json';
 import enAddFood from '@/locales/en/add-food.json';
 import enRegisterRestaurant from '@/locales/en/register-restaurant.json';
 import enFooter from '@/locales/en/footer.json';
+import enCoupons from '@/locales/en/coupons.json';
 
 // Import Arabic translations
 import arCommon from '@/locales/ar/common.json';
@@ -26,6 +27,7 @@ import arRestaurants from '@/locales/ar/restaurants.json';
 import arAddFood from '@/locales/ar/add-food.json';
 import arRegisterRestaurant from '@/locales/ar/register-restaurant.json';
 import arFooter from '@/locales/ar/footer.json';
+import arCoupons from '@/locales/ar/coupons.json';
 
 type Language = 'ar' | 'en';
 
@@ -49,7 +51,8 @@ const enTranslations = {
   ...enRestaurants,
   ...enAddFood,
   ...enRegisterRestaurant,
-  ...enFooter
+  ...enFooter,
+  ...enCoupons
 };
 
 // Merge all Arabic translations
@@ -64,7 +67,8 @@ const arTranslations = {
   ...arRestaurants,
   ...arAddFood,
   ...arRegisterRestaurant,
-  ...arFooter
+  ...arFooter,
+  ...arCoupons
 };
 
 // Combine translations for all languages

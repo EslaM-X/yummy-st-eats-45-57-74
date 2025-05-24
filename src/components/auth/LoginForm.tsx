@@ -45,21 +45,25 @@ const LoginForm: React.FC<LoginFormProps> = ({ onSuccess, onForgotPassword }) =>
       
       const { error, data } = await signIn(values.email, values.password);
       
-      if (error) throw error;
+      if (error) {
+        // عرض رسالة خطأ واضحة للمستخدم
+        toast({
+          title: language === 'ar' ? "خطأ في تسجيل الدخول" : "Login Error",
+          description: error.message,
+          variant: "destructive",
+        });
+        throw error;
+      }
       
-      console.log("Login response:", data);
+      console.log("Login successful:", data);
       
-      toast({
-        title: "تم تسجيل الدخول بنجاح",
-        description: "مرحبًا بعودتك!",
-      });
-      
+      // إزالة رسالة النجاح المكررة - سيتم التعامل معها في AuthContext
       if (onSuccess) {
         onSuccess();
       }
     } catch (error: any) {
-      // سيتم التعامل مع الخطأ في خدمة المصادقة
       console.error("Login error in component:", error);
+      // تم التعامل مع الخطأ بالفعل أعلاه
     } finally {
       setLoading(false);
     }
