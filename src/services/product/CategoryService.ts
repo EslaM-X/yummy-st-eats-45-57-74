@@ -16,7 +16,10 @@ export class CategoryService {
         return [];
       }
 
-      return data || [];
+      return (data || []).map(category => ({
+        ...category,
+        updated_at: category.created_at // Use created_at as fallback for updated_at
+      }));
     } catch (error) {
       console.error('Exception fetching categories:', error);
       return [];
