@@ -79,11 +79,16 @@ const AdminPendingContent: React.FC = () => {
         owner_id: restaurant.owner_id || undefined,
         status: restaurant.status,
         created_at: restaurant.created_at,
-        profiles: restaurant.profiles && 
-                 typeof restaurant.profiles === 'object' && 
-                 !('error' in restaurant.profiles) &&
-                 restaurant.profiles !== null
-          ? restaurant.profiles 
+        profiles: (restaurant.profiles && 
+                  typeof restaurant.profiles === 'object' && 
+                  !('error' in restaurant.profiles) &&
+                  restaurant.profiles !== null)
+          ? {
+              id: restaurant.profiles.id,
+              full_name: restaurant.profiles.full_name,
+              phone: restaurant.profiles.phone,
+              email: restaurant.profiles.email
+            }
           : null,
       }));
       setPendingRestaurants(formattedRestaurants);
@@ -101,17 +106,25 @@ const AdminPendingContent: React.FC = () => {
         owner_id: food.owner_id || undefined,
         status: food.status,
         created_at: food.created_at,
-        restaurants: food.restaurants && 
-                    typeof food.restaurants === 'object' && 
-                    !('error' in food.restaurants) &&
-                    food.restaurants !== null
-          ? food.restaurants 
+        restaurants: (food.restaurants && 
+                     typeof food.restaurants === 'object' && 
+                     !('error' in food.restaurants) &&
+                     food.restaurants !== null)
+          ? {
+              id: food.restaurants.id,
+              name: food.restaurants.name
+            }
           : null,
-        profiles: food.profiles && 
-                 typeof food.profiles === 'object' && 
-                 !('error' in food.profiles) &&
-                 food.profiles !== null
-          ? food.profiles 
+        profiles: (food.profiles && 
+                  typeof food.profiles === 'object' && 
+                  !('error' in food.profiles) &&
+                  food.profiles !== null)
+          ? {
+              id: food.profiles.id,
+              full_name: food.profiles.full_name,
+              phone: food.profiles.phone,
+              email: food.profiles.email
+            }
           : null,
       }));
       setPendingFoods(formattedFoods);
