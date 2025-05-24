@@ -12,6 +12,7 @@ import ProductsPage from './pages/ProductsPage';
 import CartPage from './pages/CartPage';
 import CheckoutPage from './pages/CheckoutPage';
 import RegisterRestaurantPage from './pages/RegisterRestaurantPage';
+import RestaurantDashboardPage from './pages/RestaurantDashboardPage';
 import CouponsPage from './pages/CouponsPage';
 import ProfilePage from './pages/ProfilePage';
 import AuthPage from './pages/AuthPage';
@@ -78,6 +79,10 @@ function App() {
         <Route 
           path="/register-restaurant" 
           element={user ? <RegisterRestaurantPage /> : <Navigate to="/auth" />} 
+        />
+        <Route 
+          path="/restaurant-dashboard" 
+          element={user ? <RestaurantDashboardPage /> : <Navigate to="/auth" />} 
         />
         <Route 
           path="/profile" 

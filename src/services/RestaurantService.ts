@@ -23,6 +23,29 @@ export interface Restaurant {
   updated_at: string;
 }
 
+// Database types to match Supabase schema
+interface DatabaseRestaurant {
+  id?: string;
+  name?: string;
+  description?: string;
+  address: string;
+  phone?: string;
+  email?: string;
+  logo_url?: string;
+  cover_image_url?: string;
+  cuisine_type?: string[];
+  avg_rating?: number;
+  delivery_fee?: number;
+  min_order_amount?: number;
+  estimated_delivery_time?: string;
+  is_active?: boolean;
+  opening_hours?: any;
+  location_id?: string;
+  owner_id?: string;
+  created_at?: string;
+  updated_at?: string;
+}
+
 export class RestaurantService {
   static async getAllRestaurants() {
     try {
@@ -30,7 +53,7 @@ export class RestaurantService {
         .from('restaurants')
         .select('*')
         .eq('is_active', true)
-        .order('rating', { ascending: false });
+        .order('avg_rating', { ascending: false });
 
       if (error) throw error;
       return data;
@@ -72,7 +95,7 @@ export class RestaurantService {
     }
   }
 
-  static async createRestaurant(restaurantData: Partial<Restaurant>) {
+  static async createRestaurant(restaurantData: DatabaseRestaurant) {
     try {
       const { data, error } = await supabase
         .from('restaurants')
@@ -88,7 +111,7 @@ export class RestaurantService {
     }
   }
 
-  static async updateRestaurant(id: string, updates: Partial<Restaurant>) {
+  static async updateRestaurant(id: string, updates: Partial<DatabaseRestaurant>) {
     try {
       const { data, error } = await supabase
         .from('restaurants')
