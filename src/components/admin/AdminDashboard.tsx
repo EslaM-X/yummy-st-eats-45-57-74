@@ -9,10 +9,10 @@ import TopRestaurants from './dashboard/TopRestaurants';
 import SystemAlerts from './dashboard/SystemAlerts';
 import RecentOrders from './dashboard/RecentOrders';
 import TransactionStats from './dashboard/TransactionStats';
-import { Users, ShoppingBag, TrendingUp, AlertCircle } from 'lucide-react';
-import { supabase } from '@/integrations/supabase/client';
+import { Users, ShoppingBag, TrendingUp, Store, AlertCircle, CheckCircle } from 'lucide-react';
+import { AdminService } from '@/services/AdminService';
+import { useToast } from '@/hooks/use-toast';
 
-// تعريف نوع Alert
 type Alert = {
   type: "error" | "success" | "warning" | "info";
   title: string;
@@ -25,96 +25,101 @@ const AdminDashboard: React.FC = () => {
     ordersCount: 0,
     totalSales: 0,
     restaurantsCount: 0,
+    activeRestaurants: 0,
     pendingOrders: 0,
+    pendingRestaurants: 0,
+    pendingFoods: 0,
+    completedOrders: 0,
+    totalRefunds: 0,
   });
   const [loading, setLoading] = useState(true);
   const [salesData, setSalesData] = useState([]);
   const [topRestaurants, setTopRestaurants] = useState([]);
-  const [systemAlerts, setSystemAlerts] = useState<Alert[]>([
-    { type: "info", title: 'مرحباً بك', message: 'تم ربط لوحة الإدارة بقاعدة البيانات بنجاح' },
-  ]);
+  const [systemAlerts, setSystemAlerts] = useState<Alert[]>([]);
+  const { toast } = useToast();
 
   useEffect(() => {
-    fetchDashboardStats();
+    fetchDashboardData();
   }, []);
 
-  const fetchDashboardStats = async () => {
+  const fetchDashboardData = async () => {
     try {
       setLoading(true);
 
-      // جلب عدد المستخدمين
-      const { count: usersCount } = await supabase
-        .from('profiles')
-        .select('*', { count: 'exact', head: true });
-
-      // جلب عدد الطلبات
-      const { count: ordersCount } = await supabase
-        .from('orders')
-        .select('*', { count: 'exact', head: true });
-
-      // جلب عدد المطاعم
-      const { count: restaurantsCount } = await supabase
-        .from('restaurants')
-        .select('*', { count: 'exact', head: true });
-
-      // جلب إجمالي المبيعات
-      const { data: salesData } = await supabase
-        .from('orders')
-        .select('total_amount')
-        .eq('payment_status', 'completed');
-
-      const totalSales = salesData?.reduce((sum, order) => sum + (order.total_amount || 0), 0) || 0;
-
-      // جلب الطلبات المعلقة
-      const { count: pendingOrders } = await supabase
-        .from('orders')
-        .select('*', { count: 'exact', head: true })
-        .eq('status', 'new');
-
-      // جلب أفضل المطاعم
-      const { data: restaurantsData } = await supabase
-        .from('restaurants')
-        .select('name, avg_rating, id')
-        .order('avg_rating', { ascending: false })
-        .limit(5);
+      // جلب الإحصائيات العامة
+      const dashboardStats = await AdminService.getDashboardStats();
+      setStats(dashboardStats);
 
       // جلب بيانات المبيعات الأسبوعية
-      const { data: weeklyOrders } = await supabase
-        .from('orders')
-        .select('total_amount, created_at')
-        .eq('payment_status', 'completed')
-        .gte('created_at', new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString());
-
+      const weeklyOrders = await AdminService.getSalesData('week');
+      
       // تجميع المبيعات حسب اليوم
-      const salesByDay = weeklyOrders?.reduce((acc, order) => {
+      const salesByDay = weeklyOrders.reduce((acc, order) => {
         const day = new Date(order.created_at).toLocaleDateString('ar-SA', { weekday: 'long' });
-        acc[day] = (acc[day] || 0) + order.total_amount;
+        acc[day] = (acc[day] || 0) + (order.total_amount || 0);
         return acc;
-      }, {} as Record<string, number>) || {};
+      }, {} as Record<string, number>);
 
       const formattedSalesData = Object.entries(salesByDay).map(([day, amount]) => ({
         day,
         amount
       }));
 
-      setStats({
-        usersCount: usersCount || 0,
-        ordersCount: ordersCount || 0,
-        totalSales,
-        restaurantsCount: restaurantsCount || 0,
-        pendingOrders: pendingOrders || 0,
-      });
-
-      setTopRestaurants(restaurantsData || []);
       setSalesData(formattedSalesData);
 
-    } catch (error) {
-      console.error('Error fetching dashboard stats:', error);
-      setSystemAlerts(prev => [...prev, {
+      // جلب أفضل المطاعم
+      const restaurants = await AdminService.getTopRestaurants(5);
+      setTopRestaurants(restaurants);
+
+      // إنشاء تنبيهات النظام
+      const alerts: Alert[] = [
+        { type: "info", title: 'مرحباً بك', message: 'تم تحديث لوحة الإدارة بالبيانات الحقيقية' }
+      ];
+
+      if (dashboardStats.pendingOrders > 0) {
+        alerts.push({
+          type: "warning",
+          title: "طلبات معلقة",
+          message: `يوجد ${dashboardStats.pendingOrders} طلب جديد يحتاج للمعالجة`
+        });
+      }
+
+      if (dashboardStats.pendingRestaurants > 0) {
+        alerts.push({
+          type: "warning",
+          title: "مطاعم معلقة",
+          message: `يوجد ${dashboardStats.pendingRestaurants} مطعم ينتظر الموافقة`
+        });
+      }
+
+      if (dashboardStats.pendingFoods > 0) {
+        alerts.push({
+          type: "warning",
+          title: "أطعمة معلقة",
+          message: `يوجد ${dashboardStats.pendingFoods} منتج ينتظر الموافقة`
+        });
+      }
+
+      setSystemAlerts(alerts);
+
+      toast({
+        title: "تم تحديث البيانات",
+        description: "تم جلب أحدث البيانات من قاعدة البيانات بنجاح",
+      });
+
+    } catch (error: any) {
+      console.error('Error fetching dashboard data:', error);
+      setSystemAlerts([{
         type: "error",
         title: "خطأ في تحميل البيانات",
-        message: "حدث خطأ أثناء جلب إحصائيات لوحة التحكم"
+        message: error.message || "حدث خطأ أثناء جلب إحصائيات لوحة التحكم"
       }]);
+      
+      toast({
+        title: "خطأ في تحميل البيانات",
+        description: error.message || "حدث خطأ أثناء جلب البيانات",
+        variant: "destructive",
+      });
     } finally {
       setLoading(false);
     }
@@ -132,10 +137,16 @@ const AdminDashboard: React.FC = () => {
     <div className="space-y-6">
       <div className="flex justify-between items-center">
         <h1 className="text-2xl font-bold text-gray-900 dark:text-white">لوحة التحكم</h1>
+        <button 
+          onClick={fetchDashboardData}
+          className="px-4 py-2 bg-teal-600 text-white rounded-md hover:bg-teal-700 transition-colors"
+        >
+          تحديث البيانات
+        </button>
       </div>
       
       {/* الإحصائيات العامة */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         <StatCard
           title="المستخدمين"
           value={stats.usersCount.toLocaleString()}
@@ -155,7 +166,7 @@ const AdminDashboard: React.FC = () => {
         <StatCard
           title="المبيعات"
           value={`${stats.totalSales.toLocaleString()} ريال`}
-          trend={`إجمالي المبيعات المكتملة`}
+          trend={`${stats.completedOrders} طلب مكتمل`}
           icon={<TrendingUp className="h-5 w-5" />}
           iconBgColor="bg-green-100 dark:bg-green-900/30"
           iconTextColor="text-green-700 dark:text-green-400"
@@ -163,10 +174,38 @@ const AdminDashboard: React.FC = () => {
         <StatCard
           title="المطاعم"
           value={stats.restaurantsCount.toLocaleString()}
-          trend={`مطعم نشط في المنصة`}
-          icon={<AlertCircle className="h-5 w-5" />}
+          trend={`${stats.activeRestaurants} مطعم نشط`}
+          icon={<Store className="h-5 w-5" />}
           iconBgColor="bg-purple-100 dark:bg-purple-900/30"
           iconTextColor="text-purple-700 dark:text-purple-400"
+        />
+      </div>
+
+      {/* إحصائيات إضافية */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <StatCard
+          title="الطلبات المكتملة"
+          value={stats.completedOrders.toLocaleString()}
+          trend="إجمالي الطلبات المنجزة"
+          icon={<CheckCircle className="h-5 w-5" />}
+          iconBgColor="bg-emerald-100 dark:bg-emerald-900/30"
+          iconTextColor="text-emerald-700 dark:text-emerald-400"
+        />
+        <StatCard
+          title="المبالغ المستردة"
+          value={`${stats.totalRefunds.toLocaleString()} ريال`}
+          trend="إجمالي المبالغ المستردة"
+          icon={<AlertCircle className="h-5 w-5" />}
+          iconBgColor="bg-red-100 dark:bg-red-900/30"
+          iconTextColor="text-red-700 dark:text-red-400"
+        />
+        <StatCard
+          title="المحتوى المعلق"
+          value={(stats.pendingRestaurants + stats.pendingFoods).toLocaleString()}
+          trend={`${stats.pendingRestaurants} مطاعم، ${stats.pendingFoods} أطعمة`}
+          icon={<AlertCircle className="h-5 w-5" />}
+          iconBgColor="bg-orange-100 dark:bg-orange-900/30"
+          iconTextColor="text-orange-700 dark:text-orange-400"
         />
       </div>
       

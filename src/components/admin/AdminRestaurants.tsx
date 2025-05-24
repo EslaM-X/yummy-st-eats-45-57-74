@@ -1,13 +1,13 @@
 
 import React, { useState, useEffect } from 'react';
-import { Search, Plus, Edit, Trash, Star, Eye } from 'lucide-react';
+import { Search, Edit, Trash, Star, Eye, RefreshCw } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from '@/hooks/use-toast';
-import { supabase } from '@/integrations/supabase/client';
+import { AdminService } from '@/services/AdminService';
 
 interface Restaurant {
   id: string;
@@ -16,11 +16,21 @@ interface Restaurant {
   cuisine_type: string[];
   is_active: boolean;
   avg_rating: number;
+  rating_count: number;
   created_at: string;
+  updated_at: string;
   logo_url?: string;
   owner_id: string;
   phone?: string;
   description?: string;
+  delivery_fee: number;
+  min_order_amount: number;
+  profiles?: {
+    id: string;
+    full_name: string;
+    phone: string;
+    email: string;
+  };
 }
 
 const AdminRestaurants: React.FC = () => {
@@ -37,14 +47,8 @@ const AdminRestaurants: React.FC = () => {
   const fetchRestaurants = async () => {
     try {
       setLoading(true);
-      const { data, error } = await supabase
-        .from('restaurants')
-        .select('*')
-        .order('created_at', { ascending: false });
-
-      if (error) throw error;
-
-      setRestaurants(data || []);
+      const data = await AdminService.getAllRestaurants();
+      setRestaurants(data);
     } catch (error: any) {
       console.error('Error fetching restaurants:', error);
       toast({
@@ -61,7 +65,8 @@ const AdminRestaurants: React.FC = () => {
   const filteredRestaurants = restaurants.filter(restaurant => {
     const matchesSearch = restaurant.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
                           restaurant.address.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                          restaurant.id.toLowerCase().includes(searchTerm.toLowerCase());
+                          restaurant.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                          (restaurant.profiles?.full_name || '').toLowerCase().includes(searchTerm.toLowerCase());
     
     const matchesTab = selectedTab === 'all' ||
                       (selectedTab === 'active' && restaurant.is_active) ||
@@ -72,13 +77,8 @@ const AdminRestaurants: React.FC = () => {
 
   const handleToggleStatus = async (restaurantId: string, currentStatus: boolean) => {
     try {
-      const { error } = await supabase
-        .from('restaurants')
-        .update({ is_active: !currentStatus })
-        .eq('id', restaurantId);
-
-      if (error) throw error;
-
+      await AdminService.toggleRestaurantStatus(restaurantId, !currentStatus);
+      
       setRestaurants(prev => 
         prev.map(restaurant => 
           restaurant.id === restaurantId 
@@ -107,13 +107,7 @@ const AdminRestaurants: React.FC = () => {
     }
 
     try {
-      const { error } = await supabase
-        .from('restaurants')
-        .delete()
-        .eq('id', restaurantId);
-
-      if (error) throw error;
-
+      await AdminService.deleteRestaurant(restaurantId);
       setRestaurants(prev => prev.filter(restaurant => restaurant.id !== restaurantId));
 
       toast({
@@ -160,6 +154,10 @@ const AdminRestaurants: React.FC = () => {
                 className="pl-8 pr-4 w-full"
               />
             </div>
+            <Button onClick={fetchRestaurants} variant="outline" className="w-full sm:w-auto">
+              <RefreshCw className="h-4 w-4 mr-2 rtl:mr-0 rtl:ml-2" />
+              تحديث
+            </Button>
           </div>
         </CardHeader>
         <CardContent>
@@ -197,6 +195,7 @@ const AdminRestaurants: React.FC = () => {
                     <div className="absolute bottom-2 right-2 bg-black/60 rounded-full px-2 py-1 flex items-center">
                       <Star className="h-3 w-3 text-yellow-400 fill-yellow-400 mr-1 rtl:mr-0 rtl:ml-1" />
                       <span className="text-xs font-medium text-white">{restaurant.avg_rating?.toFixed(1) || '0.0'}</span>
+                      <span className="text-xs text-gray-300 mr-1 rtl:mr-0 rtl:ml-1">({restaurant.rating_count || 0})</span>
                     </div>
                   </div>
                   <CardContent className="p-4">
@@ -204,6 +203,11 @@ const AdminRestaurants: React.FC = () => {
                       <div className="flex-1">
                         <h3 className="font-semibold text-lg mb-1 truncate">{restaurant.name}</h3>
                         <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">{restaurant.id}</p>
+                        {restaurant.profiles && (
+                          <p className="text-sm text-gray-600 dark:text-gray-300 mb-1">
+                            المالك: {restaurant.profiles.full_name}
+                          </p>
+                        )}
                       </div>
                     </div>
                     
@@ -225,6 +229,11 @@ const AdminRestaurants: React.FC = () => {
                     <p className="text-sm text-gray-600 dark:text-gray-400 mb-2 line-clamp-2">
                       {restaurant.address}
                     </p>
+                    
+                    <div className="text-xs text-gray-500 dark:text-gray-400 mb-2">
+                      <p>رسوم التوصيل: {restaurant.delivery_fee} ريال</p>
+                      <p>الحد الأدنى للطلب: {restaurant.min_order_amount} ريال</p>
+                    </div>
                     
                     <div className="text-xs text-gray-500 dark:text-gray-400 mb-4">
                       تاريخ الإنضمام: {new Date(restaurant.created_at).toLocaleDateString('ar-SA')}

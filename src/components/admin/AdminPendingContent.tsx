@@ -5,10 +5,52 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
-import { PendingRestaurant, PendingFood } from '@/types/admin';
-import { supabase } from '@/integrations/supabase/client';
-import { Check, X, Clock, Store, UtensilsCrossed } from 'lucide-react';
+import { Check, X, Clock, Store, UtensilsCrossed, RefreshCw } from 'lucide-react';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
+import { AdminService } from '@/services/AdminService';
+
+interface PendingRestaurant {
+  id: string;
+  name: string;
+  description?: string;
+  address?: string;
+  phone?: string;
+  email?: string;
+  cuisine_type?: string;
+  image_url?: string;
+  owner_id?: string;
+  status: string;
+  created_at: string;
+  profiles?: {
+    id: string;
+    full_name: string;
+    phone: string;
+    email: string;
+  };
+}
+
+interface PendingFood {
+  id: string;
+  name: string;
+  description?: string;
+  price: number;
+  category?: string;
+  image_url?: string;
+  restaurant_id?: string;
+  owner_id?: string;
+  status: string;
+  created_at: string;
+  restaurants?: {
+    id: string;
+    name: string;
+  };
+  profiles?: {
+    id: string;
+    full_name: string;
+    phone: string;
+    email: string;
+  };
+}
 
 const AdminPendingContent: React.FC = () => {
   const { toast } = useToast();
@@ -25,38 +67,23 @@ const AdminPendingContent: React.FC = () => {
     setIsLoading(true);
     try {
       // Fetch pending restaurants
-      const { data: restaurants, error: restaurantsError } = await supabase
-        .from('pending_restaurants')
-        .select('*')
-        .eq('status', 'pending')
-        .order('created_at', { ascending: false });
-
-      if (restaurantsError) {
-        console.error('Error fetching restaurants:', restaurantsError);
-        setPendingRestaurants([]);
-      } else {
-        setPendingRestaurants(restaurants as PendingRestaurant[] || []);
-      }
+      const restaurants = await AdminService.getPendingRestaurants();
+      setPendingRestaurants(restaurants);
 
       // Fetch pending foods
-      const { data: foods, error: foodsError } = await supabase
-        .from('pending_foods')
-        .select('*')
-        .eq('status', 'pending')
-        .order('created_at', { ascending: false });
+      const foods = await AdminService.getPendingFoods();
+      setPendingFoods(foods);
 
-      if (foodsError) {
-        console.error('Error fetching foods:', foodsError);
-        setPendingFoods([]);
-      } else {
-        setPendingFoods(foods as PendingFood[] || []);
-      }
+      toast({
+        title: "تم تحديث البيانات",
+        description: "تم جلب المحتوى المعلق بنجاح",
+      });
 
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error fetching pending content:', error);
       toast({
         title: "خطأ",
-        description: "فشل في تحميل المحتوى المعلق",
+        description: error.message || "فشل في تحميل المحتوى المعلق",
         variant: "destructive",
       });
     } finally {
@@ -70,40 +97,10 @@ const AdminPendingContent: React.FC = () => {
     notes: string = ''
   ) => {
     try {
-      // Update pending restaurant status
-      const { error: updateError } = await supabase
-        .from('pending_restaurants')
-        .update({
-          status: action,
-          admin_notes: notes,
-          reviewed_at: new Date().toISOString()
-        })
-        .eq('id', restaurantId);
-
-      if (updateError) throw updateError;
-
-      // If approved, copy to main restaurants table
       if (action === 'approved') {
-        const restaurant = pendingRestaurants.find(r => r.id === restaurantId);
-        if (restaurant) {
-          const { error: insertError } = await supabase
-            .from('restaurants')
-            .insert({
-              name: restaurant.name,
-              description: restaurant.description || '',
-              address: restaurant.address || '',
-              phone: restaurant.phone,
-              logo_url: restaurant.image_url,
-              cuisine_type: restaurant.cuisine_type ? [restaurant.cuisine_type] : [],
-              owner_id: restaurant.owner_id,
-              is_active: true
-            });
-
-          if (insertError) {
-            console.error('Error inserting approved restaurant:', insertError);
-            throw insertError;
-          }
-        }
+        await AdminService.approveRestaurant(restaurantId, notes);
+      } else {
+        await AdminService.rejectRestaurant(restaurantId, notes);
       }
 
       toast({
@@ -112,11 +109,11 @@ const AdminPendingContent: React.FC = () => {
       });
 
       fetchPendingContent();
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error handling restaurant action:', error);
       toast({
         title: "خطأ",
-        description: "فشل في معالجة الطلب",
+        description: error.message || "فشل في معالجة الطلب",
         variant: "destructive",
       });
     }
@@ -128,39 +125,10 @@ const AdminPendingContent: React.FC = () => {
     notes: string = ''
   ) => {
     try {
-      // Update pending food status
-      const { error: updateError } = await supabase
-        .from('pending_foods')
-        .update({
-          status: action,
-          admin_notes: notes,
-          reviewed_at: new Date().toISOString()
-        })
-        .eq('id', foodId);
-
-      if (updateError) throw updateError;
-
-      // If approved, copy to main products table
       if (action === 'approved') {
-        const food = pendingFoods.find(f => f.id === foodId);
-        if (food) {
-          const { error: insertError } = await supabase
-            .from('products')
-            .insert({
-              name: food.name,
-              description: food.description || '',
-              price: food.price,
-              category_id: null, // Will need to map categories properly
-              image: food.image_url,
-              restaurant_id: food.restaurant_id,
-              available: true
-            });
-
-          if (insertError) {
-            console.error('Error inserting approved food:', insertError);
-            throw insertError;
-          }
-        }
+        await AdminService.approveFood(foodId, notes);
+      } else {
+        await AdminService.rejectFood(foodId, notes);
       }
 
       toast({
@@ -169,11 +137,11 @@ const AdminPendingContent: React.FC = () => {
       });
 
       fetchPendingContent();
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error handling food action:', error);
       toast({
         title: "خطأ",
-        description: "فشل في معالجة الطلب",
+        description: error.message || "فشل في معالجة الطلب",
         variant: "destructive",
       });
     }
@@ -181,15 +149,22 @@ const AdminPendingContent: React.FC = () => {
 
   if (isLoading) {
     return (
-      <div className="flex justify-center p-10">
+      <div className="flex justify-center items-center h-64">
         <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-primary"></div>
+        <span className="mr-3 text-lg">جاري تحميل المحتوى المعلق...</span>
       </div>
     );
   }
 
   return (
     <div className="space-y-6">
-      <h2 className="text-3xl font-bold">المحتوى المعلق للمراجعة</h2>
+      <div className="flex justify-between items-center">
+        <h2 className="text-3xl font-bold">المحتوى المعلق للمراجعة</h2>
+        <Button onClick={fetchPendingContent} variant="outline">
+          <RefreshCw className="h-4 w-4 mr-2 rtl:mr-0 rtl:ml-2" />
+          تحديث
+        </Button>
+      </div>
 
       <Tabs defaultValue="restaurants" className="space-y-6">
         <TabsList className="grid w-full grid-cols-2">
@@ -242,6 +217,9 @@ const AdminPendingContent: React.FC = () => {
                       )}
                       {restaurant.cuisine_type && (
                         <p><strong>نوع المطبخ:</strong> {restaurant.cuisine_type}</p>
+                      )}
+                      {restaurant.profiles && (
+                        <p><strong>المالك:</strong> {restaurant.profiles.full_name}</p>
                       )}
                     </div>
                     
@@ -321,6 +299,12 @@ const AdminPendingContent: React.FC = () => {
                       <p><strong>السعر:</strong> {food.price} ريال</p>
                       {food.category && (
                         <p><strong>الفئة:</strong> {food.category}</p>
+                      )}
+                      {food.restaurants && (
+                        <p><strong>المطعم:</strong> {food.restaurants.name}</p>
+                      )}
+                      {food.profiles && (
+                        <p><strong>المالك:</strong> {food.profiles.full_name}</p>
                       )}
                     </div>
                     

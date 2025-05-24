@@ -1,103 +1,64 @@
 
-import React, { useState } from 'react';
-import { Search, Plus, Filter, Edit, Trash, User } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Search, Plus, Edit, Trash, User } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from '@/hooks/use-toast';
+import { AdminService } from '@/services/AdminService';
 
 interface User {
   id: string;
-  name: string;
+  full_name: string;
   email: string;
   phone: string;
-  status: 'نشط' | 'محظور' | 'معلق';
-  role: 'مستخدم' | 'مدير مطعم' | 'مشرف';
-  orders: number;
-  joinDate: string;
+  user_type: 'customer' | 'restaurant_owner' | 'admin';
+  created_at: string;
+  updated_at: string;
+  address?: string;
+  avatar_url?: string;
 }
 
 const AdminUsers: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedTab, setSelectedTab] = useState('all');
+  const [users, setUsers] = useState<User[]>([]);
+  const [loading, setLoading] = useState(true);
   const { toast } = useToast();
 
-  // Mock users data
-  const mockUsers: User[] = [
-    {
-      id: 'USR-1542',
-      name: 'أحمد محمد',
-      email: 'ahmed@example.com',
-      phone: '0561234567',
-      status: 'نشط',
-      role: 'مستخدم',
-      orders: 14,
-      joinDate: '2023-05-12'
-    },
-    {
-      id: 'USR-1867',
-      name: 'نورة سعد',
-      email: 'noura@example.com',
-      phone: '0598765432',
-      status: 'نشط',
-      role: 'مستخدم',
-      orders: 27,
-      joinDate: '2023-08-24'
-    },
-    {
-      id: 'USR-2104',
-      name: 'خالد العمري',
-      email: 'khalid@example.com',
-      phone: '0551122334',
-      status: 'محظور',
-      role: 'مستخدم',
-      orders: 3,
-      joinDate: '2024-01-05'
-    },
-    {
-      id: 'USR-1298',
-      name: 'عبدالله سامي',
-      email: 'abdullah@example.com',
-      phone: '0505443322',
-      status: 'معلق',
-      role: 'مدير مطعم',
-      orders: 0,
-      joinDate: '2023-11-19'
-    },
-    {
-      id: 'USR-2356',
-      name: 'سارة الأحمد',
-      email: 'sarah@example.com',
-      phone: '0533221144',
-      status: 'نشط',
-      role: 'مشرف',
-      orders: 8,
-      joinDate: '2024-02-28'
-    },
-    {
-      id: 'USR-1954',
-      name: 'محمد العتيبي',
-      email: 'mohammed@example.com',
-      phone: '0549876543',
-      status: 'نشط',
-      role: 'مستخدم',
-      orders: 19,
-      joinDate: '2023-07-14'
+  useEffect(() => {
+    fetchUsers();
+  }, []);
+
+  const fetchUsers = async () => {
+    try {
+      setLoading(true);
+      const data = await AdminService.getAllUsers();
+      setUsers(data);
+    } catch (error: any) {
+      console.error('Error fetching users:', error);
+      toast({
+        title: "خطأ في تحميل المستخدمين",
+        description: error.message || "حدث خطأ أثناء تحميل بيانات المستخدمين",
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
     }
-  ];
+  };
 
   // Filter users based on search term and tab
-  const filteredUsers = mockUsers.filter(user => {
-    const matchesSearch = user.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         user.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
+  const filteredUsers = users.filter(user => {
+    const matchesSearch = (user.full_name || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         (user.email || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
                          user.id.toLowerCase().includes(searchTerm.toLowerCase());
     
     const matchesTab = selectedTab === 'all' ||
-                      (selectedTab === 'active' && user.status === 'نشط') ||
-                      (selectedTab === 'blocked' && user.status === 'محظور') ||
-                      (selectedTab === 'suspended' && user.status === 'معلق');
+                      (selectedTab === 'customers' && user.user_type === 'customer') ||
+                      (selectedTab === 'restaurant_owners' && user.user_type === 'restaurant_owner') ||
+                      (selectedTab === 'admins' && user.user_type === 'admin');
     
     return matchesSearch && matchesTab;
   });
@@ -110,12 +71,26 @@ const AdminUsers: React.FC = () => {
     });
   };
 
-  const handleDeleteUser = (userId: string) => {
-    toast({
-      title: "حذف المستخدم",
-      description: `تم حذف المستخدم ${userId}`,
-      variant: "destructive"
-    });
+  const handleDeleteUser = async (userId: string) => {
+    if (!confirm('هل أنت متأكد من حذف هذا المستخدم؟ هذا الإجراء لا يمكن التراجع عنه.')) {
+      return;
+    }
+
+    try {
+      await AdminService.deleteUser(userId);
+      setUsers(users.filter(user => user.id !== userId));
+      toast({
+        title: "تم حذف المستخدم",
+        description: "تم حذف المستخدم بنجاح",
+      });
+    } catch (error: any) {
+      console.error('Error deleting user:', error);
+      toast({
+        title: "خطأ في حذف المستخدم",
+        description: error.message || "حدث خطأ أثناء حذف المستخدم",
+        variant: "destructive",
+      });
+    }
   };
 
   const handleAddNewUser = () => {
@@ -125,38 +100,46 @@ const AdminUsers: React.FC = () => {
     });
   };
 
-  // Get status badge style
-  const getStatusBadge = (status: User['status']) => {
-    switch (status) {
-      case 'نشط':
-        return 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300';
-      case 'محظور':
-        return 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300';
-      case 'معلق':
-        return 'bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-300';
-      default:
-        return 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300';
-    }
-  };
-
-  const getRoleBadge = (role: User['role']) => {
-    switch (role) {
-      case 'مستخدم':
+  // Get user type badge style
+  const getUserTypeBadge = (userType: string) => {
+    switch (userType) {
+      case 'customer':
         return 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300 border-blue-200 dark:border-blue-800';
-      case 'مدير مطعم':
+      case 'restaurant_owner':
         return 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-300 border-purple-200 dark:border-purple-800';
-      case 'مشرف':
+      case 'admin':
         return 'bg-teal-100 text-teal-800 dark:bg-teal-900 dark:text-teal-300 border-teal-200 dark:border-teal-800';
       default:
         return 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300 border-gray-200 dark:border-gray-600';
     }
   };
 
+  const getUserTypeLabel = (userType: string) => {
+    switch (userType) {
+      case 'customer':
+        return 'عميل';
+      case 'restaurant_owner':
+        return 'صاحب مطعم';
+      case 'admin':
+        return 'مدير';
+      default:
+        return 'غير محدد';
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="h-8 w-8 animate-spin rounded-full border-4 border-teal-500 border-t-transparent"></div>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6">
       <Card>
         <CardHeader className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-          <CardTitle>المستخدمين</CardTitle>
+          <CardTitle>المستخدمين ({users.length})</CardTitle>
           <div className="flex flex-col sm:flex-row items-center gap-4 w-full sm:w-auto">
             <div className="relative w-full sm:w-64">
               <Search className="absolute left-2 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
@@ -176,10 +159,10 @@ const AdminUsers: React.FC = () => {
         <CardContent>
           <Tabs value={selectedTab} onValueChange={setSelectedTab} className="mb-6">
             <TabsList className="grid grid-cols-4 w-full max-w-md">
-              <TabsTrigger value="all">الكل</TabsTrigger>
-              <TabsTrigger value="active">نشط</TabsTrigger>
-              <TabsTrigger value="blocked">محظور</TabsTrigger>
-              <TabsTrigger value="suspended">معلق</TabsTrigger>
+              <TabsTrigger value="all">الكل ({users.length})</TabsTrigger>
+              <TabsTrigger value="customers">عملاء ({users.filter(u => u.user_type === 'customer').length})</TabsTrigger>
+              <TabsTrigger value="restaurant_owners">مطاعم ({users.filter(u => u.user_type === 'restaurant_owner').length})</TabsTrigger>
+              <TabsTrigger value="admins">مدراء ({users.filter(u => u.user_type === 'admin').length})</TabsTrigger>
             </TabsList>
           </Tabs>
           
@@ -189,9 +172,7 @@ const AdminUsers: React.FC = () => {
                 <tr className="border-b dark:border-gray-700">
                   <th className="px-4 py-3 text-right rtl:text-left">المستخدم</th>
                   <th className="px-4 py-3 text-right rtl:text-left">رقم الهاتف</th>
-                  <th className="px-4 py-3 text-right rtl:text-left">الدور</th>
-                  <th className="px-4 py-3 text-right rtl:text-left">الحالة</th>
-                  <th className="px-4 py-3 text-right rtl:text-left">الطلبات</th>
+                  <th className="px-4 py-3 text-right rtl:text-left">النوع</th>
                   <th className="px-4 py-3 text-right rtl:text-left">تاريخ الإنضمام</th>
                   <th className="px-4 py-3 text-center">الإجراءات</th>
                 </tr>
@@ -203,27 +184,28 @@ const AdminUsers: React.FC = () => {
                       <td className="px-4 py-3">
                         <div className="flex items-center">
                           <div className="h-10 w-10 rounded-full bg-gray-200 dark:bg-gray-700 flex items-center justify-center mr-3 rtl:mr-0 rtl:ml-3">
-                            <User className="h-5 w-5 text-gray-500 dark:text-gray-400" />
+                            {user.avatar_url ? (
+                              <img src={user.avatar_url} alt={user.full_name} className="h-10 w-10 rounded-full object-cover" />
+                            ) : (
+                              <User className="h-5 w-5 text-gray-500 dark:text-gray-400" />
+                            )}
                           </div>
                           <div>
-                            <p className="font-medium">{user.name}</p>
+                            <p className="font-medium">{user.full_name || 'غير محدد'}</p>
                             <p className="text-xs text-gray-500 dark:text-gray-400">{user.email}</p>
+                            <p className="text-xs text-gray-400 dark:text-gray-500">{user.id}</p>
                           </div>
                         </div>
                       </td>
-                      <td className="px-4 py-3 text-sm">{user.phone}</td>
+                      <td className="px-4 py-3 text-sm">{user.phone || 'غير محدد'}</td>
                       <td className="px-4 py-3">
-                        <Badge variant="outline" className={getRoleBadge(user.role)}>
-                          {user.role}
+                        <Badge variant="outline" className={getUserTypeBadge(user.user_type)}>
+                          {getUserTypeLabel(user.user_type)}
                         </Badge>
                       </td>
-                      <td className="px-4 py-3">
-                        <span className={`px-2 py-1 text-xs font-semibold rounded-full ${getStatusBadge(user.status)}`}>
-                          {user.status}
-                        </span>
+                      <td className="px-4 py-3 text-sm">
+                        {new Date(user.created_at).toLocaleDateString('ar-SA')}
                       </td>
-                      <td className="px-4 py-3 text-sm">{user.orders}</td>
-                      <td className="px-4 py-3 text-sm">{user.joinDate}</td>
                       <td className="px-4 py-3">
                         <div className="flex justify-center space-x-2 rtl:space-x-reverse">
                           <Button variant="ghost" size="sm" onClick={() => handleEditUser(user.id)}>
@@ -240,7 +222,7 @@ const AdminUsers: React.FC = () => {
                   ))
                 ) : (
                   <tr>
-                    <td colSpan={7} className="px-4 py-8 text-center text-gray-500 dark:text-gray-400">
+                    <td colSpan={5} className="px-4 py-8 text-center text-gray-500 dark:text-gray-400">
                       لا يوجد مستخدمين مطابقين لمعايير البحث
                     </td>
                   </tr>
