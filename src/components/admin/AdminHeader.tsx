@@ -35,6 +35,10 @@ const AdminHeader: React.FC<AdminHeaderProps> = ({ activeTab, handleLogout }) =>
       case 'users': return 'المستخدمين';
       case 'restaurants': return 'المطاعم';
       case 'orders': return 'الطلبات';
+      case 'coupons': return 'الكوبونات';
+      case 'pending': return 'المراجعة';
+      case 'refunds': return 'الاستردادات';
+      case 'payments': return 'المدفوعات';
       case 'settings': return 'الإعدادات';
       default: return '';
     }
@@ -59,24 +63,24 @@ const AdminHeader: React.FC<AdminHeaderProps> = ({ activeTab, handleLogout }) =>
   const unreadCount = notifications.filter(n => !n.read).length;
 
   return (
-    <header className="sticky top-0 z-10 bg-white dark:bg-gray-800 shadow-sm px-4 md:px-6 py-4 flex justify-between items-center">
+    <header className="sticky top-0 z-10 bg-white dark:bg-gray-800 shadow-sm px-4 md:px-6 py-4 flex justify-between items-center border-b border-gray-200 dark:border-gray-700">
       <div className="flex items-center gap-3">
         <h1 className="text-xl md:text-2xl font-bold text-gray-800 dark:text-white font-cairo truncate">
           {getTabTitle(activeTab)}
         </h1>
         {activeTab === 'dashboard' && (
-          <Badge variant="outline" className="hidden md:flex bg-teal-100 text-teal-800 dark:bg-teal-900 dark:text-teal-300">
+          <Badge variant="outline" className="hidden md:flex bg-teal-100 text-teal-800 dark:bg-teal-900 dark:text-teal-300 border-teal-300 dark:border-teal-700">
             مباشر
           </Badge>
         )}
       </div>
       <div className="flex items-center gap-2 md:gap-4">
         <div className="relative md:block hidden">
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400 dark:text-gray-500" />
           <input
             type="text"
             placeholder="بحث..."
-            className="py-2 pl-10 pr-4 rounded-full border border-gray-200 dark:border-gray-700 focus:outline-none focus:ring-2 focus:ring-teal-500 dark:bg-gray-700 dark:text-white text-sm md:w-[200px] lg:w-[300px]"
+            className="py-2 pl-10 pr-4 rounded-full border border-gray-200 dark:border-gray-600 focus:outline-none focus:ring-2 focus:ring-teal-500 dark:bg-gray-700 dark:text-white text-sm md:w-[200px] lg:w-[300px] bg-white placeholder-gray-500 dark:placeholder-gray-400"
           />
         </div>
         
@@ -86,7 +90,7 @@ const AdminHeader: React.FC<AdminHeaderProps> = ({ activeTab, handleLogout }) =>
             variant="ghost" 
             size="icon" 
             onClick={() => setShowNotifications(!showNotifications)}
-            className="relative"
+            className="relative text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white"
           >
             <Bell className="h-5 w-5" />
             {unreadCount > 0 && (
@@ -99,8 +103,8 @@ const AdminHeader: React.FC<AdminHeaderProps> = ({ activeTab, handleLogout }) =>
           {showNotifications && (
             <div className="absolute top-full right-0 mt-2 w-80 bg-white dark:bg-gray-800 shadow-lg rounded-lg z-50 border border-gray-200 dark:border-gray-700">
               <div className="flex justify-between items-center p-3 border-b border-gray-200 dark:border-gray-700">
-                <h3 className="font-semibold">الإشعارات</h3>
-                <Button variant="ghost" size="sm" onClick={markAllAsRead}>
+                <h3 className="font-semibold text-gray-900 dark:text-white">الإشعارات</h3>
+                <Button variant="ghost" size="sm" onClick={markAllAsRead} className="text-gray-600 dark:text-gray-300">
                   تعيين الكل كمقروء
                 </Button>
               </div>
@@ -121,7 +125,7 @@ const AdminHeader: React.FC<AdminHeaderProps> = ({ activeTab, handleLogout }) =>
                         <AlertCircle className="h-4 w-4 text-white" />
                       </div>
                       <div className="flex-1">
-                        <p className="text-sm font-medium">{notif.text}</p>
+                        <p className="text-sm font-medium text-gray-900 dark:text-white">{notif.text}</p>
                         <span className="text-xs text-gray-500 dark:text-gray-400">{notif.time}</span>
                       </div>
                       {!notif.read && (
@@ -140,7 +144,7 @@ const AdminHeader: React.FC<AdminHeaderProps> = ({ activeTab, handleLogout }) =>
           )}
         </div>
         
-        <Button variant="ghost" size="icon" onClick={toggleTheme} className="hidden sm:flex">
+        <Button variant="ghost" size="icon" onClick={toggleTheme} className="hidden sm:flex text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white">
           {theme === 'dark' ? (
             <Sun className="h-5 w-5" />
           ) : (
@@ -148,14 +152,14 @@ const AdminHeader: React.FC<AdminHeaderProps> = ({ activeTab, handleLogout }) =>
           )}
         </Button>
         
-        <Button variant="ghost" size="icon" onClick={handleLogout} className="hidden sm:flex">
+        <Button variant="ghost" size="icon" onClick={handleLogout} className="hidden sm:flex text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white">
           <LogOut className="h-5 w-5" />
         </Button>
 
         <div className="flex items-center gap-2 ml-2 md:ml-4">
           <div className="hidden sm:block text-right rtl:text-left">
-            <p className="text-sm font-medium truncate dark:text-white">مدير النظام</p>
-            <p className="text-xs text-gray-500 dark:text-gray-400 truncate">admin@steats.com</p>
+            <p className="text-sm font-medium truncate text-gray-900 dark:text-white">مدير النظام</p>
+            <p className="text-xs text-gray-500 dark:text-gray-400 truncate">admin@steat.app</p>
           </div>
           <div className="w-8 h-8 rounded-full bg-gradient-to-r from-teal-500 to-teal-600 flex items-center justify-center text-white font-semibold">
             م

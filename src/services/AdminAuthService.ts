@@ -7,43 +7,43 @@ export interface AdminCredentials {
 }
 
 export class AdminAuthService {
-  // بيانات تسجيل دخول الأدمن المؤقتة (يجب تغييرها في الإنتاج)
-  private static readonly ADMIN_CREDENTIALS: AdminCredentials = {
-    email: 'admin@steat.app',
-    password: 'StEat2024!'
-  };
-
   /**
-   * تسجيل دخول الأدمن
+   * تسجيل دخول الأدمن باستخدام Supabase
    */
   static async signIn(email: string, password: string) {
     try {
-      // التحقق من بيانات الاعتماد
-      if (email !== this.ADMIN_CREDENTIALS.email || password !== this.ADMIN_CREDENTIALS.password) {
-        throw new Error('بيانات تسجيل الدخول غير صحيحة');
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
+
+      if (error) {
+        throw new Error(error.message);
       }
 
-      // إنشاء جلسة مؤقتة للأدمن
-      const adminSession = {
-        user: {
-          id: 'admin-user-id',
-          email: email,
-          role: 'admin'
-        },
-        access_token: 'admin-temp-token',
-        expires_at: Date.now() + (24 * 60 * 60 * 1000) // 24 ساعة
-      };
+      if (data.user) {
+        // التحقق من صلاحيات الأدمن
+        const { data: profile, error: profileError } = await supabase
+          .from('profiles')
+          .select('user_type')
+          .eq('id', data.user.id)
+          .single();
 
-      // حفظ الجلسة في localStorage
-      localStorage.setItem('admin_session', JSON.stringify(adminSession));
-      
-      return { 
-        data: { 
-          user: adminSession.user, 
-          session: adminSession 
-        }, 
-        error: null 
-      };
+        if (profileError || profile?.user_type !== 'admin') {
+          await supabase.auth.signOut();
+          throw new Error('ليس لديك صلاحيات إدارية');
+        }
+
+        return { 
+          data: { 
+            user: data.user, 
+            session: data.session 
+          }, 
+          error: null 
+        };
+      }
+
+      throw new Error('فشل في تسجيل الدخول');
     } catch (error: any) {
       return { 
         data: null, 
@@ -57,8 +57,8 @@ export class AdminAuthService {
    */
   static async signOut() {
     try {
-      localStorage.removeItem('admin_session');
-      return { error: null };
+      const { error } = await supabase.auth.signOut();
+      return { error };
     } catch (error: any) {
       return { error: { message: error.message || 'خطأ في تسجيل الخروج' } };
     }
@@ -67,30 +67,35 @@ export class AdminAuthService {
   /**
    * الحصول على الجلسة الحالية
    */
-  static getSession() {
+  static async getSession() {
     try {
-      const sessionData = localStorage.getItem('admin_session');
-      if (!sessionData) return { data: { session: null }, error: null };
-
-      const session = JSON.parse(sessionData);
-      
-      // التحقق من انتهاء صلاحية الجلسة
-      if (Date.now() > session.expires_at) {
-        localStorage.removeItem('admin_session');
-        return { data: { session: null }, error: null };
-      }
-
-      return { data: { session }, error: null };
+      const { data, error } = await supabase.auth.getSession();
+      return { data, error };
     } catch (error) {
-      return { data: { session: null }, error: null };
+      return { data: { session: null }, error };
     }
   }
 
   /**
    * التحقق من صلاحية الأدمن
    */
-  static isAdmin(): boolean {
-    const { data } = this.getSession();
-    return data.session?.user?.role === 'admin';
+  static async isAdmin(): Promise<boolean> {
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      
+      if (!session?.user) {
+        return false;
+      }
+
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('user_type')
+        .eq('id', session.user.id)
+        .single();
+
+      return profile?.user_type === 'admin';
+    } catch (error) {
+      return false;
+    }
   }
 }

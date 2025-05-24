@@ -12,13 +12,21 @@ const AdminPage: React.FC = () => {
   const [activeTab, setActiveTab] = useState('dashboard');
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
+  const [hasCheckedAuth, setHasCheckedAuth] = useState(false);
   const navigate = useNavigate();
-  const { isAuthenticated, isAdmin, loading, handleLogout, checkAndRedirect } = useAdminAuth();
+  const { isAuthenticated, isAdmin, loading, user, handleLogout, checkAndRedirect } = useAdminAuth();
 
-  // التحقق من صلاحيات المستخدم عند تحميل الصفحة
+  // التحقق من صلاحيات المستخدم مرة واحدة فقط
   useEffect(() => {
-    checkAndRedirect();
-  }, [isAuthenticated, isAdmin]);
+    if (!loading && !hasCheckedAuth) {
+      const isAuthorized = checkAndRedirect();
+      setHasCheckedAuth(true);
+      
+      if (!isAuthorized) {
+        return; // سيتم إعادة التوجيه تلقائياً
+      }
+    }
+  }, [loading, hasCheckedAuth, checkAndRedirect]);
 
   // التحقق من حجم الشاشة عند التحميل وعند تغييرها
   useEffect(() => {
@@ -51,19 +59,21 @@ const AdminPage: React.FC = () => {
     }
   };
 
-  if (loading) {
+  // عرض شاشة التحميل أثناء فحص المصادقة
+  if (loading || !hasCheckedAuth) {
     return (
-      <div className="flex items-center justify-center h-screen">
+      <div className="flex items-center justify-center h-screen bg-gray-50 dark:bg-gray-900">
         <div className="flex flex-col items-center">
-          <div className="h-12 w-12 animate-spin rounded-full border-4 border-primary border-t-transparent"></div>
+          <div className="h-12 w-12 animate-spin rounded-full border-4 border-teal-500 border-t-transparent"></div>
           <p className="mt-4 text-gray-600 dark:text-gray-400">جاري التحميل...</p>
         </div>
       </div>
     );
   }
 
+  // عدم عرض أي محتوى إذا لم يكن المستخدم مخولاً
   if (!isAdmin || !isAuthenticated) {
-    return null; // عدم عرض أي محتوى حتى الانتقال إلى صفحة تسجيل الدخول
+    return null;
   }
 
   return (
