@@ -26,5 +26,10 @@
   "coupon_claim_failed": "فشل في الحصول على الكوبون",
   "coupon_claim_failed_description": "حدث خطأ أثناء محاولة الحصول على الكوبون",
   "error": "خطأ",
-  "error_loading": "حدث خطأ في تحميل الكوبونات"
+  "error_loading": "حدث خطأ في تحميل الكوبونات",
+  "discount_off": "خصم",
+  "save_now": "وفر الآن",
+  "limited_time": "عرض لوقت محدود",
+  "free_delivery": "توصيل مجاني",
+  "special_offer": "عرض خاص"
 }

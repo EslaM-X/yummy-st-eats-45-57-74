@@ -26,5 +26,10 @@
   "coupon_claim_failed": "Failed to Get Coupon",
   "coupon_claim_failed_description": "An error occurred while trying to get the coupon",
   "error": "Error",
-  "error_loading": "An error occurred while loading coupons"
+  "error_loading": "An error occurred while loading coupons",
+  "discount_off": "OFF",
+  "save_now": "Save Now",
+  "limited_time": "Limited Time Offer",
+  "free_delivery": "Free Delivery",
+  "special_offer": "Special Offer"
 }

@@ -67,14 +67,21 @@ const MyOrdersPage: React.FC = () => {
   return (
     <div className="flex flex-col min-h-screen bg-white dark:bg-gray-900">
       <Header />
-      <main className="flex-grow py-10">
+      <main className="flex-grow py-6 sm:py-10">
         <div className="container mx-auto px-4 sm:px-6 lg:px-8">
-          <h1 className="text-4xl font-bold text-gray-800 dark:text-white mb-8 text-center">
-            {ordersPageTitle}
-          </h1>
+          {/* Page title - responsive */}
+          <div className="text-center mb-8 sm:mb-12">
+            <h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-gray-800 dark:text-white">
+              {ordersPageTitle}
+            </h1>
+          </div>
 
-          <OrderTabs activeTab={activeTab} onTabChange={setActiveTab} />
+          {/* Tabs section */}
+          <div className="mb-6 sm:mb-8">
+            <OrderTabs activeTab={activeTab} onTabChange={setActiveTab} />
+          </div>
 
+          {/* Orders list */}
           <OrderList 
             orders={orders} 
             onViewOrder={handleViewOrder} 

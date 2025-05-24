@@ -1,106 +1,107 @@
 
-import { supabase } from "@/integrations/supabase/client";
+import { supabase } from '@/integrations/supabase/client';
+
+export interface Restaurant {
+  id: string;
+  name: string;
+  description: string;
+  address: string;
+  phone: string;
+  email: string;
+  logo_url?: string;
+  cover_image_url?: string;
+  cuisine_type: string;
+  rating: number;
+  delivery_fee: number;
+  minimum_order: number;
+  estimated_delivery_time: string;
+  is_active: boolean;
+  opening_hours: any;
+  location_id?: string;
+  owner_id: string;
+  created_at: string;
+  updated_at: string;
+}
 
 export class RestaurantService {
-  // Get all restaurants
-  static async getAllRestaurants(countryCode?: string) {
-    try {
-      let query = supabase
-        .from('restaurants')
-        .select('*')
-        .eq('is_active', true)
-        .order('name');
-      
-      // Filter by country if provided
-      if (countryCode) {
-        // This is a simplified approach - actual implementation depends on your data structure
-        query = query.ilike('address', `%${countryCode}%`);
-      }
-      
-      const { data, error } = await query;
-      
-      if (error) {
-        console.error('Error fetching restaurants:', error);
-        return [];
-      }
-      
-      return data || [];
-    } catch (error) {
-      console.error('Exception fetching restaurants:', error);
-      return [];
-    }
-  }
-  
-  // Get featured restaurants
-  static async getFeaturedRestaurants(countryCode?: string) {
-    try {
-      let query = supabase
-        .from('restaurants')
-        .select('*')
-        .eq('is_active', true)
-        .order('rating_count', { ascending: false })
-        .limit(6);
-      
-      // Filter by country if provided
-      if (countryCode) {
-        // This is a simplified approach
-        query = query.ilike('address', `%${countryCode}%`);
-      }
-      
-      const { data, error } = await query;
-      
-      if (error) {
-        console.error('Error fetching featured restaurants:', error);
-        return [];
-      }
-      
-      return data || [];
-    } catch (error) {
-      console.error('Exception fetching featured restaurants:', error);
-      return [];
-    }
-  }
-  
-  // Get restaurant details by ID
-  static async getRestaurantById(restaurantId: string) {
+  static async getAllRestaurants() {
     try {
       const { data, error } = await supabase
         .from('restaurants')
         .select('*')
-        .eq('id', restaurantId)
-        .single();
-      
-      if (error) {
-        console.error('Error fetching restaurant details:', error);
-        return null;
-      }
-      
+        .eq('is_active', true)
+        .order('rating', { ascending: false });
+
+      if (error) throw error;
       return data;
     } catch (error) {
-      console.error('Exception fetching restaurant details:', error);
+      console.error('Error fetching restaurants:', error);
+      return [];
+    }
+  }
+
+  static async getRestaurantById(id: string) {
+    try {
+      const { data, error } = await supabase
+        .from('restaurants')
+        .select('*')
+        .eq('id', id)
+        .single();
+
+      if (error) throw error;
+      return data;
+    } catch (error) {
+      console.error('Error fetching restaurant:', error);
       return null;
     }
   }
-  
-  // Get products by restaurant ID
-  static async getRestaurantProducts(restaurantId: string) {
+
+  static async getUserRestaurants(userId: string) {
     try {
       const { data, error } = await supabase
-        .from('products')
+        .from('restaurants')
         .select('*')
-        .eq('restaurant_id', restaurantId)
-        .eq('is_available', true)
-        .order('name');
-      
-      if (error) {
-        console.error('Error fetching restaurant products:', error);
-        return [];
-      }
-      
+        .eq('owner_id', userId)
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
       return data || [];
     } catch (error) {
-      console.error('Exception fetching restaurant products:', error);
+      console.error('Error fetching user restaurants:', error);
       return [];
+    }
+  }
+
+  static async createRestaurant(restaurantData: Partial<Restaurant>) {
+    try {
+      const { data, error } = await supabase
+        .from('restaurants')
+        .insert(restaurantData)
+        .select()
+        .single();
+
+      if (error) throw error;
+      return { data, error: null };
+    } catch (error) {
+      console.error('Error creating restaurant:', error);
+      return { data: null, error };
+    }
+  }
+
+  static async updateRestaurant(id: string, updates: Partial<Restaurant>) {
+    try {
+      const { data, error } = await supabase
+        .from('restaurants')
+        .update(updates)
+        .eq('id', id)
+        .select()
+        .single();
+
+      if (error) throw error;
+      return { data, error: null };
+    } catch (error) {
+      console.error('Error updating restaurant:', error);
+      return { data: null, error };
     }
   }
 }

@@ -24,19 +24,19 @@ const OrderList: React.FC<OrderListProps> = ({
     return (
       <div className="space-y-4" data-language={language}>
         {Array(3).fill(null).map((_, index) => (
-          <div key={index} className="border rounded-lg p-6">
-            <div className="flex justify-between items-center mb-4">
-              <Skeleton className="h-6 w-48" />
-              <Skeleton className="h-6 w-24" />
+          <div key={index} className="border rounded-lg p-4 sm:p-6">
+            <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center mb-4 space-y-2 sm:space-y-0">
+              <Skeleton className="h-6 w-32 sm:w-48" />
+              <Skeleton className="h-6 w-20 sm:w-24" />
             </div>
-            <div className="grid grid-cols-2 gap-4 mb-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-4 mb-4">
               <Skeleton className="h-4 w-full" />
               <Skeleton className="h-4 w-full" />
               <Skeleton className="h-4 w-full" />
               <Skeleton className="h-4 w-full" />
             </div>
             <div className="flex justify-end">
-              <Skeleton className="h-10 w-32" />
+              <Skeleton className="h-10 w-24 sm:w-32" />
             </div>
           </div>
         ))}
@@ -49,7 +49,7 @@ const OrderList: React.FC<OrderListProps> = ({
   }
 
   return (
-    <div className="space-y-4" data-language={language}>
+    <div className="space-y-3 sm:space-y-4" data-language={language}>
       {orders.map((order) => (
         <OrderCard 
           key={order.id} 
