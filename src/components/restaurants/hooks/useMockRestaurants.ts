@@ -3,6 +3,22 @@ import { useState, useEffect } from 'react';
 import { Restaurant } from '@/types';
 import { RestaurantService } from '@/services/RestaurantService';
 
+interface DatabaseRestaurant {
+  id: string;
+  name: string;
+  address: string;
+  cuisine_type?: string[];
+  avg_rating?: number;
+  delivery_fee?: number;
+  min_order_amount?: number;
+  logo_url?: string;
+  description?: string;
+  phone?: string;
+  is_active?: boolean;
+  rating_count?: number;
+  created_at?: string;
+}
+
 export const useMockRestaurants = (
   searchTerm: string,
   cuisineFilter: string,
@@ -23,13 +39,13 @@ export const useMockRestaurants = (
     const fetchRealRestaurants = async () => {
       setLoading(true);
       try {
-        const restaurantsData = await RestaurantService.getAllRestaurants();
+        const restaurantsData = await RestaurantService.getAllRestaurants() as DatabaseRestaurant[];
         
         // تحويل البيانات إلى تنسيق Restaurant مع التأكد من وجود الخصائص المطلوبة
         const formattedRestaurants: (Restaurant & { country?: string })[] = restaurantsData.map(restaurant => ({
           id: restaurant.id,
-          name: restaurant.name,
-          address: restaurant.address,
+          name: restaurant.name || '',
+          address: restaurant.address || '',
           cuisine: Array.isArray(restaurant.cuisine_type) 
             ? restaurant.cuisine_type.join(', ')
             : restaurant.cuisine_type || 'مأكولات متنوعة',
@@ -37,11 +53,11 @@ export const useMockRestaurants = (
           deliveryTime: '30-45 دقيقة', // يمكن حسابه بناءً على الموقع
           imageUrl: restaurant.logo_url || undefined,
           description: restaurant.description || '',
-          isNew: this.isNewRestaurant(restaurant.created_at),
-          discount: this.calculateDiscount(restaurant.delivery_fee),
+          isNew: isNewRestaurant(restaurant.created_at || ''),
+          discount: calculateDiscount(restaurant.delivery_fee || 0),
           country: 'SA', // افتراضي السعودية
           // خصائص إضافية من قاعدة البيانات
-          deliveryFee: restaurant.delivery_fee || 0,
+          delivery_fee: restaurant.delivery_fee || 0,
           minimumOrder: restaurant.min_order_amount || 0,
           phone: restaurant.phone,
           isActive: restaurant.is_active,
@@ -125,7 +141,7 @@ export const useMockRestaurants = (
         });
         break;
       case 'delivery_fee':
-        filtered.sort((a, b) => (a.deliveryFee || 0) - (b.deliveryFee || 0));
+        filtered.sort((a, b) => (a.delivery_fee || 0) - (b.delivery_fee || 0));
         break;
       case 'newest':
         // ترتيب حسب الأحدث (المطاعم الجديدة أولاً)
@@ -155,6 +171,7 @@ export const useMockRestaurants = (
 
   // دالة للتحقق من كون المطعم جديد (أقل من 30 يوم)
   const isNewRestaurant = (createdAt: string): boolean => {
+    if (!createdAt) return false;
     const restaurantDate = new Date(createdAt);
     const thirtyDaysAgo = new Date();
     thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);

@@ -48,7 +48,10 @@ export class CouponService {
         return [];
       }
 
-      return data || [];
+      return (data || []).map(coupon => ({
+        ...coupon,
+        discount_type: coupon.discount_type as 'percentage' | 'fixed_amount'
+      }));
     } catch (error) {
       console.error('Exception fetching coupons:', error);
       return [];
@@ -81,7 +84,7 @@ export class CouponService {
         return [];
       }
 
-      // فلترة الكوبونات المنتهية الصلاحية
+      // فلترة الكوبونات المنتهية الصلاحية وتطبيق نوع البيانات الصحيح
       const validCoupons = (data || []).filter(userCoupon => {
         const coupon = userCoupon.coupon;
         if (!coupon) return false;
@@ -97,7 +100,13 @@ export class CouponService {
         }
         
         return coupon.is_active;
-      });
+      }).map(userCoupon => ({
+        ...userCoupon,
+        coupon: userCoupon.coupon ? {
+          ...userCoupon.coupon,
+          discount_type: userCoupon.coupon.discount_type as 'percentage' | 'fixed_amount'
+        } : undefined
+      }));
 
       return validCoupons;
     } catch (error) {
@@ -186,16 +195,21 @@ export class CouponService {
   ): Promise<{success: boolean, discount: number, message: string}> {
     try {
       // الحصول على تفاصيل الكوبون
-      const { data: coupon, error: couponError } = await supabase
+      const { data: couponData, error: couponError } = await supabase
         .from('coupons')
         .select('*')
         .eq('id', couponId)
         .eq('is_active', true)
         .single();
 
-      if (couponError || !coupon) {
+      if (couponError || !couponData) {
         return { success: false, discount: 0, message: 'كوبون غير صالح أو منتهي الصلاحية' };
       }
+
+      const coupon: Coupon = {
+        ...couponData,
+        discount_type: couponData.discount_type as 'percentage' | 'fixed_amount'
+      };
 
       // التحقق من انتهاء الصلاحية
       if (coupon.expires_at && new Date(coupon.expires_at) < new Date()) {
@@ -274,7 +288,10 @@ export class CouponService {
         return null;
       }
 
-      return data;
+      return {
+        ...data,
+        discount_type: data.discount_type as 'percentage' | 'fixed_amount'
+      };
     } catch (error) {
       console.error('Exception creating coupon:', error);
       return null;
@@ -298,7 +315,10 @@ export class CouponService {
         return null;
       }
 
-      return data;
+      return {
+        ...data,
+        discount_type: data.discount_type as 'percentage' | 'fixed_amount'
+      };
     } catch (error) {
       console.error('Exception updating coupon:', error);
       return null;

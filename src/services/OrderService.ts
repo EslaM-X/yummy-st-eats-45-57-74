@@ -200,6 +200,15 @@ export class OrderService {
         throw new Error('يجب تسجيل الدخول أولاً');
       }
 
+      // تحويل OrderItem[] إلى JSON متوافق
+      const itemsAsJson = orderData.items.map(item => ({
+        product_id: item.product_id,
+        product_name: item.product_name,
+        product_price: item.product_price,
+        quantity: item.quantity,
+        notes: item.notes || ''
+      }));
+
       // إنشاء الطلب
       const { data: order, error: orderError } = await supabase
         .from('orders')
@@ -214,7 +223,7 @@ export class OrderService {
           customer_phone: orderData.customer_phone,
           delivery_address: orderData.delivery_address,
           delivery_notes: orderData.delivery_notes,
-          items: orderData.items
+          items: itemsAsJson as any
         })
         .select()
         .single();
