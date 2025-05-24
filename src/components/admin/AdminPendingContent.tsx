@@ -68,18 +68,23 @@ const AdminPendingContent: React.FC = () => {
       // Fetch pending restaurants
       const restaurantsData = await AdminService.getPendingRestaurants();
       const formattedRestaurants: PendingRestaurant[] = restaurantsData.map(restaurant => {
-        // Handle profiles with proper null checking
+        // Handle profiles with proper null checking using type guards
         let profilesData: { id: string; full_name: string; phone: string; email: string; } | null = null;
         
         const profiles = restaurant.profiles;
         if (profiles && 
             typeof profiles === 'object' && 
-            !('error' in profiles) &&
             profiles !== null &&
+            !Array.isArray(profiles) &&
+            !('error' in profiles) &&
             'id' in profiles &&
             'full_name' in profiles &&
             'phone' in profiles &&
-            'email' in profiles) {
+            'email' in profiles &&
+            typeof profiles.id === 'string' &&
+            typeof profiles.full_name === 'string' &&
+            typeof profiles.phone === 'string' &&
+            typeof profiles.email === 'string') {
           profilesData = {
             id: profiles.id,
             full_name: profiles.full_name,
@@ -114,28 +119,36 @@ const AdminPendingContent: React.FC = () => {
         const restaurants = food.restaurants;
         if (restaurants && 
             typeof restaurants === 'object' && 
-            !('error' in restaurants) &&
             restaurants !== null &&
+            !Array.isArray(restaurants) &&
+            !('error' in restaurants) &&
             'id' in restaurants &&
-            'name' in restaurants) {
+            'name' in restaurants &&
+            typeof restaurants.id === 'string' &&
+            typeof restaurants.name === 'string') {
           restaurantsData = {
             id: restaurants.id,
             name: restaurants.name
           };
         }
 
-        // Handle profiles with proper null checking
+        // Handle profiles with proper null checking using type guards
         let profilesData: { id: string; full_name: string; phone: string; email: string; } | null = null;
         
         const profiles = food.profiles;
         if (profiles && 
             typeof profiles === 'object' && 
-            !('error' in profiles) &&
             profiles !== null &&
+            !Array.isArray(profiles) &&
+            !('error' in profiles) &&
             'id' in profiles &&
             'full_name' in profiles &&
             'phone' in profiles &&
-            'email' in profiles) {
+            'email' in profiles &&
+            typeof profiles.id === 'string' &&
+            typeof profiles.full_name === 'string' &&
+            typeof profiles.phone === 'string' &&
+            typeof profiles.email === 'string') {
           profilesData = {
             id: profiles.id,
             full_name: profiles.full_name,

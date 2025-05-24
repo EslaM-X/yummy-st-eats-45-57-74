@@ -45,6 +45,7 @@ interface DatabaseRestaurant {
 }
 
 export class RestaurantService {
+  // جلب جميع المطاعم النشطة والمعتمدة فقط
   static async getAllRestaurants() {
     try {
       const { data, error } = await supabase
@@ -54,7 +55,7 @@ export class RestaurantService {
         .order('avg_rating', { ascending: false });
 
       if (error) throw error;
-      return data;
+      return data || [];
     } catch (error) {
       console.error('Error fetching restaurants:', error);
       return [];
@@ -67,6 +68,7 @@ export class RestaurantService {
         .from('restaurants')
         .select('*')
         .eq('id', id)
+        .eq('is_active', true)
         .single();
 
       if (error) throw error;
@@ -93,11 +95,25 @@ export class RestaurantService {
     }
   }
 
+  // إنشاء مطعم جديد في جدول الانتظار
   static async createRestaurant(restaurantData: DatabaseRestaurant) {
     try {
+      // إنشاء طلب مطعم في جدول الانتظار بدلاً من إنشاءه مباشرة
       const { data, error } = await supabase
-        .from('restaurants')
-        .insert(restaurantData)
+        .from('pending_restaurants')
+        .insert({
+          name: restaurantData.name,
+          description: restaurantData.description || '',
+          address: restaurantData.address,
+          phone: restaurantData.phone,
+          email: restaurantData.email || '',
+          cuisine_type: Array.isArray(restaurantData.cuisine_type) 
+            ? restaurantData.cuisine_type[0] 
+            : restaurantData.cuisine_type,
+          image_url: restaurantData.logo_url,
+          owner_id: restaurantData.owner_id,
+          status: 'pending'
+        })
         .select()
         .single();
 
@@ -123,6 +139,44 @@ export class RestaurantService {
     } catch (error) {
       console.error('Error updating restaurant:', error);
       return { data: null, error };
+    }
+  }
+
+  // دالة لجلب مطاعم المستخدم مع تفاصيل إضافية
+  static async getRestaurantDetails(restaurantId: string, userId: string) {
+    try {
+      const { data, error } = await supabase
+        .from('restaurants')
+        .select(`
+          *,
+          products(count)
+        `)
+        .eq('id', restaurantId)
+        .eq('owner_id', userId)
+        .single();
+
+      if (error) throw error;
+      return data;
+    } catch (error) {
+      console.error('Error fetching restaurant details:', error);
+      return null;
+    }
+  }
+
+  // دالة لحذف مطعم (للمالكين)
+  static async deleteRestaurant(restaurantId: string, userId: string) {
+    try {
+      const { error } = await supabase
+        .from('restaurants')
+        .delete()
+        .eq('id', restaurantId)
+        .eq('owner_id', userId);
+
+      if (error) throw error;
+      return { success: true };
+    } catch (error) {
+      console.error('Error deleting restaurant:', error);
+      return { success: false, error };
     }
   }
 }

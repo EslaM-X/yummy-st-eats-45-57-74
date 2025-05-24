@@ -11,12 +11,16 @@ import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Store, Plus, Eye, Edit, Settings, TrendingUp, Clock, Star, ShoppingBag } from 'lucide-react';
+import { Store, Plus, Eye, Edit, Settings, TrendingUp, Clock, Star, ShoppingBag, Trash2 } from 'lucide-react';
+import RestaurantEditModal from '@/components/restaurant/RestaurantEditModal';
+import RestaurantSettingsModal from '@/components/restaurant/RestaurantSettingsModal';
 
 const RestaurantDashboardPage: React.FC = () => {
   const [restaurants, setRestaurants] = useState<any[]>([]);
   const [orders, setOrders] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [editingRestaurant, setEditingRestaurant] = useState<any>(null);
+  const [settingsRestaurant, setSettingsRestaurant] = useState<any>(null);
   const [stats, setStats] = useState({
     totalOrders: 0,
     pendingOrders: 0,
@@ -127,6 +131,41 @@ const RestaurantDashboardPage: React.FC = () => {
         variant: "destructive",
       });
     }
+  };
+
+  const handleDeleteRestaurant = async (restaurantId: string) => {
+    if (!confirm('هل أنت متأكد من حذف هذا المطعم؟ هذا الإجراء لا يمكن التراجع عنه.')) {
+      return;
+    }
+
+    try {
+      const result = await RestaurantService.deleteRestaurant(restaurantId, user?.id || '');
+      
+      if (result.success) {
+        setRestaurants(prev => prev.filter(restaurant => restaurant.id !== restaurantId));
+        toast({
+          title: "تم حذف المطعم",
+          description: "تم حذف المطعم بنجاح",
+        });
+      } else {
+        throw new Error('Failed to delete restaurant');
+      }
+    } catch (error: any) {
+      console.error('Error deleting restaurant:', error);
+      toast({
+        title: "خطأ",
+        description: "فشل في حذف المطعم",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleEditRestaurant = (restaurant: any) => {
+    setEditingRestaurant(restaurant);
+  };
+
+  const handleRestaurantSettings = (restaurant: any) => {
+    setSettingsRestaurant(restaurant);
   };
 
   const pageTitle = language === 'en' ? 'My Restaurants Dashboard' : 'لوحة تحكم مطاعمي';
@@ -287,11 +326,11 @@ const RestaurantDashboardPage: React.FC = () => {
                       </div>
                     </div>
                     
-                    <div className="flex gap-2">
+                    <div className="grid grid-cols-2 gap-2 mb-4">
                       <Button 
                         variant={restaurant.is_active ? "destructive" : "default"} 
                         size="sm" 
-                        className="flex-1"
+                        className="w-full"
                         onClick={() => handleUpdateRestaurantStatus(restaurant.id, !restaurant.is_active)}
                       >
                         {restaurant.is_active 
@@ -299,12 +338,32 @@ const RestaurantDashboardPage: React.FC = () => {
                           : (language === 'en' ? 'Activate' : 'تفعيل')
                         }
                       </Button>
-                      <Button variant="outline" size="sm">
+                      <Button 
+                        variant="outline" 
+                        size="sm"
+                        onClick={() => handleEditRestaurant(restaurant)}
+                      >
                         <Edit className="h-4 w-4 mr-1" />
                         {language === 'en' ? 'Edit' : 'تعديل'}
                       </Button>
-                      <Button variant="outline" size="sm">
-                        <Settings className="h-4 w-4" />
+                    </div>
+                    
+                    <div className="grid grid-cols-2 gap-2">
+                      <Button 
+                        variant="outline" 
+                        size="sm"
+                        onClick={() => handleRestaurantSettings(restaurant)}
+                      >
+                        <Settings className="h-4 w-4 mr-1" />
+                        الإعدادات
+                      </Button>
+                      <Button 
+                        variant="destructive" 
+                        size="sm"
+                        onClick={() => handleDeleteRestaurant(restaurant.id)}
+                      >
+                        <Trash2 className="h-4 w-4 mr-1" />
+                        حذف
                       </Button>
                     </div>
                   </CardContent>
@@ -314,6 +373,25 @@ const RestaurantDashboardPage: React.FC = () => {
           )}
         </div>
       </main>
+      
+      {/* Modal for editing restaurant */}
+      {editingRestaurant && (
+        <RestaurantEditModal
+          restaurant={editingRestaurant}
+          onClose={() => setEditingRestaurant(null)}
+          onUpdate={fetchUserRestaurants}
+        />
+      )}
+      
+      {/* Modal for restaurant settings */}
+      {settingsRestaurant && (
+        <RestaurantSettingsModal
+          restaurant={settingsRestaurant}
+          onClose={() => setSettingsRestaurant(null)}
+          onUpdate={fetchUserRestaurants}
+        />
+      )}
+      
       <Footer />
     </div>
   );
