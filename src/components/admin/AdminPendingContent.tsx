@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -71,19 +70,21 @@ const AdminPendingContent: React.FC = () => {
       const formattedRestaurants: PendingRestaurant[] = restaurantsData.map(restaurant => {
         // Handle profiles with proper null checking
         let profilesData: { id: string; full_name: string; phone: string; email: string; } | null = null;
-        if (restaurant.profiles && 
-            typeof restaurant.profiles === 'object' && 
-            !('error' in restaurant.profiles) &&
-            restaurant.profiles !== null &&
-            'id' in restaurant.profiles &&
-            'full_name' in restaurant.profiles &&
-            'phone' in restaurant.profiles &&
-            'email' in restaurant.profiles) {
+        
+        const profiles = restaurant.profiles;
+        if (profiles && 
+            typeof profiles === 'object' && 
+            !('error' in profiles) &&
+            profiles !== null &&
+            'id' in profiles &&
+            'full_name' in profiles &&
+            'phone' in profiles &&
+            'email' in profiles) {
           profilesData = {
-            id: restaurant.profiles.id,
-            full_name: restaurant.profiles.full_name,
-            phone: restaurant.profiles.phone,
-            email: restaurant.profiles.email
+            id: profiles.id,
+            full_name: profiles.full_name,
+            phone: profiles.phone,
+            email: profiles.email
           };
         }
 
@@ -109,33 +110,37 @@ const AdminPendingContent: React.FC = () => {
       const formattedFoods: PendingFood[] = foodsData.map(food => {
         // Handle restaurants with proper null checking
         let restaurantsData: { id: string; name: string; } | null = null;
-        if (food.restaurants && 
-            typeof food.restaurants === 'object' && 
-            !('error' in food.restaurants) &&
-            food.restaurants !== null &&
-            'id' in food.restaurants &&
-            'name' in food.restaurants) {
+        
+        const restaurants = food.restaurants;
+        if (restaurants && 
+            typeof restaurants === 'object' && 
+            !('error' in restaurants) &&
+            restaurants !== null &&
+            'id' in restaurants &&
+            'name' in restaurants) {
           restaurantsData = {
-            id: food.restaurants.id,
-            name: food.restaurants.name
+            id: restaurants.id,
+            name: restaurants.name
           };
         }
 
         // Handle profiles with proper null checking
         let profilesData: { id: string; full_name: string; phone: string; email: string; } | null = null;
-        if (food.profiles && 
-            typeof food.profiles === 'object' && 
-            !('error' in food.profiles) &&
-            food.profiles !== null &&
-            'id' in food.profiles &&
-            'full_name' in food.profiles &&
-            'phone' in food.profiles &&
-            'email' in food.profiles) {
+        
+        const profiles = food.profiles;
+        if (profiles && 
+            typeof profiles === 'object' && 
+            !('error' in profiles) &&
+            profiles !== null &&
+            'id' in profiles &&
+            'full_name' in profiles &&
+            'phone' in profiles &&
+            'email' in profiles) {
           profilesData = {
-            id: food.profiles.id,
-            full_name: food.profiles.full_name,
-            phone: food.profiles.phone,
-            email: food.profiles.email
+            id: profiles.id,
+            full_name: profiles.full_name,
+            phone: profiles.phone,
+            email: profiles.email
           };
         }
 
