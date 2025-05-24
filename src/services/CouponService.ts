@@ -3,10 +3,9 @@ import { supabase } from '@/integrations/supabase/client';
 
 export interface Coupon {
   id: string;
+  code: string;
   title: string;
-  title_en?: string;
   description?: string;
-  description_en?: string;
   discount_type: 'percentage' | 'fixed_amount';
   discount_value: number;
   minimum_order: number;
@@ -14,10 +13,9 @@ export interface Coupon {
   used_count: number;
   expires_at?: string;
   is_active: boolean;
-  created_by?: string;
   created_at: string;
   updated_at: string;
-  code: string;
+  created_by?: string;
 }
 
 export interface UserCoupon {
@@ -27,24 +25,31 @@ export interface UserCoupon {
   used_at?: string;
   order_id?: string;
   created_at: string;
-  coupon?: Coupon;
+  coupon: Coupon;
+}
+
+export interface CouponUsage {
+  id: string;
+  coupon_id: string;
+  user_id: string;
+  order_id?: string;
+  discount_amount: number;
+  used_at: string;
 }
 
 export class CouponService {
-  /**
-   * جلب جميع الكوبونات النشطة
-   */
+  // جلب جميع الكوبونات النشطة
   static async getActiveCoupons(): Promise<Coupon[]> {
     try {
       const { data, error } = await supabase
         .from('coupons')
         .select('*')
         .eq('is_active', true)
-        .or('expires_at.is.null,expires_at.gt.' + new Date().toISOString())
+        .or('expires_at.is.null,expires_at.gte.' + new Date().toISOString())
         .order('created_at', { ascending: false });
 
       if (error) {
-        console.error('Error fetching coupons:', error);
+        console.error('Error fetching active coupons:', error);
         return [];
       }
 
@@ -53,22 +58,14 @@ export class CouponService {
         discount_type: coupon.discount_type as 'percentage' | 'fixed_amount'
       }));
     } catch (error) {
-      console.error('Exception fetching coupons:', error);
+      console.error('Exception fetching active coupons:', error);
       return [];
     }
   }
 
-  /**
-   * جلب كوبونات المستخدم المتاحة
-   */
-  static async getUserCoupons(userId?: string): Promise<UserCoupon[]> {
+  // جلب كوبونات المستخدم
+  static async getUserCoupons(userId: string): Promise<UserCoupon[]> {
     try {
-      if (!userId) {
-        const { data: user } = await supabase.auth.getUser();
-        if (!user.user) return [];
-        userId = user.user.id;
-      }
-
       const { data, error } = await supabase
         .from('user_coupons')
         .select(`
@@ -76,7 +73,6 @@ export class CouponService {
           coupon:coupon_id (*)
         `)
         .eq('user_id', userId)
-        .is('used_at', null)
         .order('created_at', { ascending: false });
 
       if (error) {
@@ -84,126 +80,41 @@ export class CouponService {
         return [];
       }
 
-      // فلترة الكوبونات المنتهية الصلاحية وتطبيق نوع البيانات الصحيح
-      const validCoupons = (data || []).filter(userCoupon => {
-        const coupon = userCoupon.coupon;
-        if (!coupon) return false;
-        
-        // التحقق من انتهاء الصلاحية
-        if (coupon.expires_at && new Date(coupon.expires_at) < new Date()) {
-          return false;
-        }
-        
-        // التحقق من حد الاستخدام
-        if (coupon.max_uses && coupon.used_count >= coupon.max_uses) {
-          return false;
-        }
-        
-        return coupon.is_active;
-      }).map(userCoupon => ({
+      return (data || []).map(userCoupon => ({
         ...userCoupon,
-        coupon: userCoupon.coupon ? {
+        coupon: {
           ...userCoupon.coupon,
           discount_type: userCoupon.coupon.discount_type as 'percentage' | 'fixed_amount'
-        } : undefined
-      }));
-
-      return validCoupons;
+        }
+      })) as UserCoupon[];
     } catch (error) {
       console.error('Exception fetching user coupons:', error);
       return [];
     }
   }
 
-  /**
-   * إضافة كوبون لحساب المستخدم
-   */
-  static async addCouponToUser(userId: string, couponCode: string): Promise<{success: boolean, message: string}> {
+  // تطبيق كوبون والحصول على قيمة الخصم
+  static async applyCoupon(couponCode: string, orderAmount: number, userId: string): Promise<{
+    success: boolean;
+    discount: number;
+    coupon?: Coupon;
+    message?: string;
+  }> {
     try {
-      // البحث عن الكوبون بالكود
-      const { data: coupon, error: couponError } = await supabase
+      // البحث عن الكوبون
+      const { data: couponData, error: couponError } = await supabase
         .from('coupons')
         .select('*')
         .eq('code', couponCode)
         .eq('is_active', true)
         .single();
 
-      if (couponError || !coupon) {
-        return { success: false, message: 'كود الكوبون غير صحيح أو منتهي الصلاحية' };
-      }
-
-      // التحقق من انتهاء الصلاحية
-      if (coupon.expires_at && new Date(coupon.expires_at) < new Date()) {
-        return { success: false, message: 'انتهت صلاحية هذا الكوبون' };
-      }
-
-      // التحقق من حد الاستخدام
-      if (coupon.max_uses && coupon.used_count >= coupon.max_uses) {
-        return { success: false, message: 'تم استنفاد عدد مرات استخدام هذا الكوبون' };
-      }
-
-      // التحقق من عدم وجود الكوبون مسبقاً للمستخدم
-      const { data: existingCoupon } = await supabase
-        .from('user_coupons')
-        .select('id')
-        .eq('user_id', userId)
-        .eq('coupon_id', coupon.id)
-        .single();
-
-      if (existingCoupon) {
-        return { success: false, message: 'لديك هذا الكوبون بالفعل' };
-      }
-
-      // إضافة الكوبون للمستخدم
-      const { error } = await supabase
-        .from('user_coupons')
-        .insert({
-          user_id: userId,
-          coupon_id: coupon.id
-        });
-
-      if (error) {
-        console.error('Error adding coupon to user:', error);
-        return { success: false, message: 'حدث خطأ أثناء إضافة الكوبون' };
-      }
-
-      // إرسال إشعار للمستخدم
-      await supabase
-        .from('notifications')
-        .insert({
-          user_id: userId,
-          notification_type: 'coupon',
-          title: 'تم إضافة كوبون جديد',
-          message: `تم إضافة كوبون "${coupon.title}" بنجاح`,
-          reference_id: coupon.id
-        });
-
-      return { success: true, message: 'تم إضافة الكوبون بنجاح' };
-    } catch (error) {
-      console.error('Exception adding coupon to user:', error);
-      return { success: false, message: 'حدث خطأ غير متوقع' };
-    }
-  }
-
-  /**
-   * تطبيق كوبون على طلب
-   */
-  static async applyCoupon(
-    userId: string, 
-    couponId: string, 
-    orderTotal: number
-  ): Promise<{success: boolean, discount: number, message: string}> {
-    try {
-      // الحصول على تفاصيل الكوبون
-      const { data: couponData, error: couponError } = await supabase
-        .from('coupons')
-        .select('*')
-        .eq('id', couponId)
-        .eq('is_active', true)
-        .single();
-
       if (couponError || !couponData) {
-        return { success: false, discount: 0, message: 'كوبون غير صالح أو منتهي الصلاحية' };
+        return {
+          success: false,
+          discount: 0,
+          message: 'كوبون غير صحيح أو منتهي الصلاحية'
+        };
       }
 
       const coupon: Coupon = {
@@ -211,75 +122,92 @@ export class CouponService {
         discount_type: couponData.discount_type as 'percentage' | 'fixed_amount'
       };
 
-      // التحقق من انتهاء الصلاحية
+      // التحقق من انتهاء صلاحية الكوبون
       if (coupon.expires_at && new Date(coupon.expires_at) < new Date()) {
-        return { success: false, discount: 0, message: 'انتهت صلاحية الكوبون' };
-      }
-
-      // التحقق من الحد الأدنى للطلب
-      if (orderTotal < coupon.minimum_order) {
-        return { 
-          success: false, 
-          discount: 0, 
-          message: `الحد الأدنى للطلب هو ${coupon.minimum_order} ريال` 
+        return {
+          success: false,
+          discount: 0,
+          message: 'انتهت صلاحية هذا الكوبون'
         };
       }
 
-      // التحقق من وجود الكوبون للمستخدم وعدم استخدامه
-      const { data: userCoupon } = await supabase
+      // التحقق من الحد الأدنى للطلب
+      if (orderAmount < coupon.minimum_order) {
+        return {
+          success: false,
+          discount: 0,
+          message: `الحد الأدنى للطلب ${coupon.minimum_order} ريال`
+        };
+      }
+
+      // التحقق من عدد مرات الاستخدام
+      if (coupon.max_uses && coupon.used_count >= coupon.max_uses) {
+        return {
+          success: false,
+          discount: 0,
+          message: 'تم استخدام هذا الكوبون بالكامل'
+        };
+      }
+
+      // التحقق من استخدام المستخدم للكوبون من قبل
+      const { data: usageData } = await supabase
         .from('user_coupons')
         .select('*')
         .eq('user_id', userId)
-        .eq('coupon_id', couponId)
-        .single();
+        .eq('coupon_id', coupon.id)
+        .not('used_at', 'is', null);
 
-      if (!userCoupon) {
-        return { success: false, discount: 0, message: 'ليس لديك هذا الكوبون' };
-      }
-
-      if (userCoupon.used_at) {
-        return { success: false, discount: 0, message: 'تم استخدام هذا الكوبون من قبل' };
+      if (usageData && usageData.length > 0) {
+        return {
+          success: false,
+          discount: 0,
+          message: 'تم استخدام هذا الكوبون من قبل'
+        };
       }
 
       // حساب قيمة الخصم
       let discount = 0;
       if (coupon.discount_type === 'percentage') {
-        discount = orderTotal * (coupon.discount_value / 100);
+        discount = (orderAmount * coupon.discount_value) / 100;
       } else {
         discount = coupon.discount_value;
       }
 
-      // التأكد من عدم تجاوز قيمة الخصم قيمة الطلب
-      discount = Math.min(discount, orderTotal);
+      // التأكد من أن الخصم لا يتجاوز قيمة الطلب
+      discount = Math.min(discount, orderAmount);
 
       return {
         success: true,
-        discount: discount,
-        message: 'تم تطبيق الكوبون بنجاح'
+        discount,
+        coupon
       };
     } catch (error) {
-      console.error('Exception applying coupon:', error);
-      return { success: false, discount: 0, message: 'حدث خطأ غير متوقع' };
+      console.error('Error applying coupon:', error);
+      return {
+        success: false,
+        discount: 0,
+        message: 'حدث خطأ أثناء تطبيق الكوبون'
+      };
     }
   }
 
-  /**
-   * إنشاء كوبون جديد (للإدارة فقط)
-   */
-  static async createCoupon(couponData: Omit<Coupon, 'id' | 'created_at' | 'updated_at' | 'used_count'>): Promise<Coupon | null> {
+  // إنشاء كوبون جديد (للإدارة)
+  static async createCoupon(couponData: Partial<Coupon>): Promise<Coupon | null> {
     try {
-      const { data: user } = await supabase.auth.getUser();
-      if (!user.user) {
-        throw new Error('يجب تسجيل الدخول أولاً');
-      }
-
       const { data, error } = await supabase
         .from('coupons')
-        .insert({
-          ...couponData,
-          used_count: 0,
-          created_by: user.user.id
-        })
+        .insert([{
+          code: couponData.code,
+          title: couponData.title,
+          description: couponData.description,
+          discount_type: couponData.discount_type,
+          discount_value: couponData.discount_value,
+          minimum_order: couponData.minimum_order || 0,
+          max_uses: couponData.max_uses,
+          expires_at: couponData.expires_at,
+          is_active: true,
+          used_count: 0
+        }])
         .select()
         .single();
 
@@ -298,9 +226,7 @@ export class CouponService {
     }
   }
 
-  /**
-   * تحديث كوبون (للإدارة فقط)
-   */
+  // تحديث كوبون
   static async updateCoupon(couponId: string, updates: Partial<Coupon>): Promise<Coupon | null> {
     try {
       const { data, error } = await supabase
@@ -325,149 +251,101 @@ export class CouponService {
     }
   }
 
-  /**
-   * حذف كوبون (للإدارة فقط)
-   */
-  static async deleteCoupon(couponId: string): Promise<boolean> {
+  // استخدام كوبون (عند إكمال الطلب)
+  static async useCoupon(couponId: string, userId: string, orderId: string, discountAmount: number): Promise<boolean> {
     try {
-      const { error } = await supabase
-        .from('coupons')
-        .delete()
-        .eq('id', couponId);
-
-      if (error) {
-        console.error('Error deleting coupon:', error);
-        return false;
-      }
-
-      return true;
-    } catch (error) {
-      console.error('Exception deleting coupon:', error);
-      return false;
-    }
-  }
-
-  /**
-   * وضع علامة على الكوبون كمستخدم
-   */
-  static async markCouponAsUsed(userId: string, couponId: string, orderId: string): Promise<boolean> {
-    try {
-      const { error } = await supabase
+      // تسجيل استخدام الكوبون
+      const { error: usageError } = await supabase
         .from('user_coupons')
         .update({
           used_at: new Date().toISOString(),
           order_id: orderId
         })
-        .eq('user_id', userId)
-        .eq('coupon_id', couponId);
+        .eq('coupon_id', couponId)
+        .eq('user_id', userId);
 
-      if (error) {
-        console.error('Error marking coupon as used:', error);
+      if (usageError) {
+        console.error('Error recording coupon usage:', usageError);
         return false;
       }
 
-      // زيادة عداد استخدام الكوبون
-      await supabase.rpc('increment_coupon_usage', { coupon_id: couponId });
+      // إضافة سجل في جدول coupon_usage
+      const { error: historyError } = await supabase
+        .from('coupon_usage')
+        .insert({
+          coupon_id: couponId,
+          user_id: userId,
+          order_id: orderId,
+          discount_amount: discountAmount
+        });
+
+      if (historyError) {
+        console.error('Error creating coupon usage history:', historyError);
+        return false;
+      }
+
+      // زيادة عداد الاستخدام للكوبون
+      const { error: updateError } = await supabase.rpc('increment_coupon_usage', {
+        coupon_id: couponId
+      });
+
+      if (updateError) {
+        console.error('Error incrementing coupon usage:', updateError);
+        return false;
+      }
 
       return true;
     } catch (error) {
-      console.error('Exception marking coupon as used:', error);
+      console.error('Exception using coupon:', error);
       return false;
     }
   }
 
-  /**
-   * جلب إحصائيات الكوبونات (للإدارة)
-   */
-  static async getCouponStats() {
+  // إضافة كوبون للمستخدم
+  static async addCouponToUser(userId: string, couponId: string): Promise<boolean> {
     try {
-      const { data: coupons } = await supabase
-        .from('coupons')
-        .select('*');
-
-      const totalCoupons = coupons?.length || 0;
-      const activeCoupons = coupons?.filter(c => c.is_active).length || 0;
-      const totalUsage = coupons?.reduce((sum, c) => sum + c.used_count, 0) || 0;
-
-      const { count: distributedCoupons } = await supabase
+      const { error } = await supabase
         .from('user_coupons')
-        .select('*', { count: 'exact', head: true });
+        .insert({
+          user_id: userId,
+          coupon_id: couponId
+        });
 
-      return {
-        totalCoupons,
-        activeCoupons,
-        distributedCoupons: distributedCoupons || 0,
-        totalUsage
-      };
+      if (error) {
+        console.error('Error adding coupon to user:', error);
+        return false;
+      }
+
+      return true;
     } catch (error) {
-      console.error('Error fetching coupon stats:', error);
-      return {
-        totalCoupons: 0,
-        activeCoupons: 0,
-        distributedCoupons: 0,
-        totalUsage: 0
-      };
+      console.error('Exception adding coupon to user:', error);
+      return false;
     }
   }
 
-  /**
-   * توزيع كوبون على جميع المستخدمين (للإدارة)
-   */
-  static async distributeCouponToAllUsers(couponId: string): Promise<{success: boolean, message: string}> {
+  // جلب تاريخ استخدام الكوبونات
+  static async getCouponUsageHistory(couponId?: string): Promise<CouponUsage[]> {
     try {
-      // جلب جميع المستخدمين
-      const { data: users } = await supabase
-        .from('profiles')
-        .select('id')
-        .eq('user_type', 'customer');
+      let query = supabase
+        .from('coupon_usage')
+        .select('*')
+        .order('used_at', { ascending: false });
 
-      if (!users || users.length === 0) {
-        return { success: false, message: 'لا يوجد مستخدمين لتوزيع الكوبون عليهم' };
+      if (couponId) {
+        query = query.eq('coupon_id', couponId);
       }
 
-      // إنشاء كوبونات للمستخدمين
-      const userCoupons = users.map(user => ({
-        user_id: user.id,
-        coupon_id: couponId
-      }));
-
-      const { error } = await supabase
-        .from('user_coupons')
-        .insert(userCoupons);
+      const { data, error } = await query;
 
       if (error) {
-        console.error('Error distributing coupon:', error);
-        return { success: false, message: 'حدث خطأ أثناء توزيع الكوبون' };
+        console.error('Error fetching coupon usage history:', error);
+        return [];
       }
 
-      // إرسال إشعارات للمستخدمين
-      const { data: coupon } = await supabase
-        .from('coupons')
-        .select('title')
-        .eq('id', couponId)
-        .single();
-
-      if (coupon) {
-        const notifications = users.map(user => ({
-          user_id: user.id,
-          notification_type: 'coupon',
-          title: 'كوبون خصم جديد',
-          message: `تم إضافة كوبون "${coupon.title}" إلى حسابك`,
-          reference_id: couponId
-        }));
-
-        await supabase
-          .from('notifications')
-          .insert(notifications);
-      }
-
-      return { 
-        success: true, 
-        message: `تم توزيع الكوبون على ${users.length} مستخدم بنجاح` 
-      };
+      return data || [];
     } catch (error) {
-      console.error('Exception distributing coupon:', error);
-      return { success: false, message: 'حدث خطأ غير متوقع' };
+      console.error('Exception fetching coupon usage history:', error);
+      return [];
     }
   }
 }

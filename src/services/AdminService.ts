@@ -1,3 +1,4 @@
+
 import { supabase } from '@/integrations/supabase/client';
 
 export interface AdminUser {
@@ -139,10 +140,9 @@ export class AdminService {
         pendingFoods: pendingFoods || 0,
         completedOrders: salesData?.length || 0,
         totalRefunds,
-        // إضافة الخصائص المفقودة
         totalTransactions: ordersCount || 0,
         totalRevenue: totalSales,
-        newUsersThisMonth: 0, // يمكن حسابه لاحقاً
+        newUsersThisMonth: 0,
         activeUsers: usersCount || 0
       };
     } catch (error) {
@@ -233,7 +233,9 @@ export class AdminService {
         id: user.id,
         email: user.email || '',
         full_name: user.full_name || '',
-        user_type: user.user_type as 'admin' | 'customer' | 'restaurant_owner',
+        user_type: (user.user_type === 'customer' || user.user_type === 'restaurant_owner' || user.user_type === 'admin') 
+          ? user.user_type as 'admin' | 'customer' | 'restaurant_owner'
+          : 'customer',
         phone: user.phone || '',
         address: user.address || '',
         created_at: user.created_at,
@@ -247,23 +249,148 @@ export class AdminService {
     }
   }
 
-  // تعطيل أو تفعيل المستخدم
-  static async toggleUserStatus(userId: string, isActive: boolean): Promise<boolean> {
+  // جلب جميع الطلبات
+  static async getAllOrders() {
+    try {
+      const { data, error } = await supabase
+        .from('orders')
+        .select(`
+          *,
+          profiles:user_id (
+            id,
+            full_name,
+            phone,
+            email
+          ),
+          restaurants:restaurant_id (
+            id,
+            name,
+            address
+          )
+        `)
+        .order('created_at', { ascending: false });
+
+      if (error) {
+        console.error('Error fetching orders:', error);
+        return [];
+      }
+
+      return data || [];
+    } catch (error) {
+      console.error('Exception fetching orders:', error);
+      return [];
+    }
+  }
+
+  // تحديث حالة الطلب
+  static async updateOrderStatus(orderId: string, status: string) {
+    try {
+      const { error } = await supabase
+        .from('orders')
+        .update({ 
+          status,
+          updated_at: new Date().toISOString(),
+          ...(status === 'completed' ? { delivered_at: new Date().toISOString() } : {})
+        })
+        .eq('id', orderId);
+
+      if (error) {
+        console.error('Error updating order status:', error);
+        throw error;
+      }
+
+      return { success: true };
+    } catch (error) {
+      console.error('Exception updating order status:', error);
+      throw error;
+    }
+  }
+
+  // جلب جميع المطاعم
+  static async getAllRestaurants() {
+    try {
+      const { data, error } = await supabase
+        .from('restaurants')
+        .select(`
+          *,
+          profiles:owner_id (
+            id,
+            full_name,
+            phone,
+            email
+          )
+        `)
+        .order('created_at', { ascending: false });
+
+      if (error) {
+        console.error('Error fetching restaurants:', error);
+        return [];
+      }
+
+      return data || [];
+    } catch (error) {
+      console.error('Exception fetching restaurants:', error);
+      return [];
+    }
+  }
+
+  // تبديل حالة المطعم
+  static async toggleRestaurantStatus(restaurantId: string, isActive: boolean) {
+    try {
+      const { error } = await supabase
+        .from('restaurants')
+        .update({ is_active: isActive })
+        .eq('id', restaurantId);
+
+      if (error) {
+        console.error('Error toggling restaurant status:', error);
+        throw error;
+      }
+
+      return { success: true };
+    } catch (error) {
+      console.error('Exception toggling restaurant status:', error);
+      throw error;
+    }
+  }
+
+  // حذف مطعم
+  static async deleteRestaurant(restaurantId: string) {
+    try {
+      const { error } = await supabase
+        .from('restaurants')
+        .delete()
+        .eq('id', restaurantId);
+
+      if (error) {
+        console.error('Error deleting restaurant:', error);
+        throw error;
+      }
+
+      return { success: true };
+    } catch (error) {
+      console.error('Exception deleting restaurant:', error);
+      throw error;
+    }
+  }
+
+  // حذف مستخدم
+  static async deleteUser(userId: string) {
     try {
       const { error } = await supabase
         .from('profiles')
-        .update({ is_active: isActive })
+        .delete()
         .eq('id', userId);
 
       if (error) {
-        console.error('Error toggling user status:', error);
-        return false;
+        console.error('Error deleting user:', error);
+        throw error;
       }
 
-      return true;
+      return { success: true };
     } catch (error) {
-      console.error('Exception toggling user status:', error);
-      return false;
+      console.error('Exception deleting user:', error);
+      throw error;
     }
   }
 
@@ -272,7 +399,15 @@ export class AdminService {
     try {
       const { data, error } = await supabase
         .from('pending_restaurants')
-        .select('*')
+        .select(`
+          *,
+          profiles:owner_id (
+            id,
+            full_name,
+            phone,
+            email
+          )
+        `)
         .eq('status', 'pending')
         .order('created_at', { ascending: false });
 
@@ -288,8 +423,41 @@ export class AdminService {
     }
   }
 
+  // جلب جميع الأطعمة المعلقة
+  static async getPendingFoods() {
+    try {
+      const { data, error } = await supabase
+        .from('pending_foods')
+        .select(`
+          *,
+          profiles:owner_id (
+            id,
+            full_name,
+            phone,
+            email
+          ),
+          restaurants:restaurant_id (
+            id,
+            name
+          )
+        `)
+        .eq('status', 'pending')
+        .order('created_at', { ascending: false });
+
+      if (error) {
+        console.error('Error fetching pending foods:', error);
+        return [];
+      }
+
+      return data || [];
+    } catch (error) {
+      console.error('Exception fetching pending foods:', error);
+      return [];
+    }
+  }
+
   // الموافقة على مطعم
-  static async approveRestaurant(restaurantId: string) {
+  static async approveRestaurant(restaurantId: string, notes: string = '') {
     try {
       // جلب بيانات المطعم المعلق
       const { data: pendingRestaurant, error: pendingError } = await supabase
@@ -310,7 +478,6 @@ export class AdminService {
           description: pendingRestaurant.description,
           address: pendingRestaurant.address,
           phone: pendingRestaurant.phone,
-          email: pendingRestaurant.email,
           cuisine_type: [pendingRestaurant.cuisine_type],
           logo_url: pendingRestaurant.image_url,
           owner_id: pendingRestaurant.owner_id,
@@ -369,7 +536,7 @@ export class AdminService {
       // تحديث حالة المطعم المعلق إلى مرفوض
       const { error: updateError } = await supabase
         .from('pending_restaurants')
-        .update({ status: 'rejected', rejection_reason: reason })
+        .update({ status: 'rejected', admin_notes: reason })
         .eq('id', restaurantId);
 
       if (updateError) {
@@ -390,6 +557,109 @@ export class AdminService {
       return { success: true };
     } catch (error) {
       console.error('Error rejecting restaurant:', error);
+      return { success: false, error };
+    }
+  }
+
+  // الموافقة على طعام
+  static async approveFood(foodId: string, notes: string = '') {
+    try {
+      // جلب بيانات الطعام المعلق
+      const { data: pendingFood, error: pendingError } = await supabase
+        .from('pending_foods')
+        .select('*')
+        .eq('id', foodId)
+        .single();
+
+      if (pendingError || !pendingFood) {
+        throw new Error('الطعام المعلق غير موجود');
+      }
+
+      // إنشاء المنتج الجديد
+      const { data: newProduct, error: createError } = await supabase
+        .from('products')
+        .insert({
+          name: pendingFood.name,
+          description: pendingFood.description,
+          price: pendingFood.price,
+          image: pendingFood.image_url,
+          restaurant_id: pendingFood.restaurant_id,
+          available: true,
+          featured: false
+        })
+        .select()
+        .single();
+
+      if (createError) {
+        throw createError;
+      }
+
+      // حذف الطعام المعلق
+      const { error: deleteError } = await supabase
+        .from('pending_foods')
+        .delete()
+        .eq('id', foodId);
+
+      if (deleteError) {
+        throw deleteError;
+      }
+
+      // إرسال إشعار للمالك
+      await supabase
+        .from('notifications')
+        .insert({
+          user_id: pendingFood.owner_id,
+          notification_type: 'success',
+          title: 'تمت الموافقة على طعامك',
+          message: `تمت الموافقة على ${pendingFood.name} بنجاح`,
+          reference_id: newProduct.id
+        });
+
+      return { success: true };
+    } catch (error) {
+      console.error('Error approving food:', error);
+      return { success: false, error };
+    }
+  }
+
+  // رفض طعام
+  static async rejectFood(foodId: string, reason: string) {
+    try {
+      // جلب بيانات الطعام المعلق
+      const { data: pendingFood, error: pendingError } = await supabase
+        .from('pending_foods')
+        .select('owner_id, name')
+        .eq('id', foodId)
+        .single();
+
+      if (pendingError || !pendingFood) {
+        throw new Error('الطعام المعلق غير موجود');
+      }
+
+      // تحديث حالة الطعام المعلق إلى مرفوض
+      const { error: updateError } = await supabase
+        .from('pending_foods')
+        .update({ status: 'rejected', admin_notes: reason })
+        .eq('id', foodId);
+
+      if (updateError) {
+        throw updateError;
+      }
+
+      // إرسال إشعار للمالك
+      await supabase
+        .from('notifications')
+        .insert({
+          user_id: pendingFood.owner_id,
+          notification_type: 'error',
+          title: 'تم رفض طعامك',
+          message: `تم رفض ${pendingFood.name} بسبب: ${reason}`,
+          reference_id: foodId
+        });
+
+      return { success: true };
+    } catch (error) {
+      console.error('Error rejecting food:', error);
       return { success: false, error };
     }
   }

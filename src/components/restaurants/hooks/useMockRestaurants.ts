@@ -50,13 +50,12 @@ export const useMockRestaurants = (
             ? restaurant.cuisine_type.join(', ')
             : restaurant.cuisine_type || 'مأكولات متنوعة',
           rating: restaurant.avg_rating || 0,
-          deliveryTime: '30-45 دقيقة', // يمكن حسابه بناءً على الموقع
+          deliveryTime: '30-45 دقيقة',
           imageUrl: restaurant.logo_url || undefined,
           description: restaurant.description || '',
           isNew: isNewRestaurant(restaurant.created_at || ''),
-          discount: calculateDiscount(restaurant.delivery_fee || 0),
-          country: 'SA', // افتراضي السعودية
-          // خصائص إضافية من قاعدة البيانات
+          discount: calculateDiscount(restaurant.delivery_fee || 0)?.toString() || '',
+          country: 'SA',
           delivery_fee: restaurant.delivery_fee || 0,
           minimumOrder: restaurant.min_order_amount || 0,
           phone: restaurant.phone,
@@ -119,7 +118,7 @@ export const useMockRestaurants = (
 
     // تطبيق فلتر المطاعم التي لديها خصومات
     if (showDiscountOnly) {
-      filtered = filtered.filter(restaurant => restaurant.discount && restaurant.discount > 0);
+      filtered = filtered.filter(restaurant => restaurant.discount && parseFloat(restaurant.discount) > 0);
     }
 
     // تطبيق فلتر الدولة
@@ -152,7 +151,7 @@ export const useMockRestaurants = (
         });
         break;
       case 'discount':
-        filtered.sort((a, b) => (b.discount || 0) - (a.discount || 0));
+        filtered.sort((a, b) => (parseFloat(b.discount || '0')) - (parseFloat(a.discount || '0')));
         break;
       default:
         // الترتيب الموصى به (حسب التقييم والشعبية)
