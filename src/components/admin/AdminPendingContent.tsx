@@ -67,66 +67,82 @@ const AdminPendingContent: React.FC = () => {
     try {
       // Fetch pending restaurants
       const restaurantsData = await AdminService.getPendingRestaurants();
-      const formattedRestaurants: PendingRestaurant[] = restaurantsData.map(restaurant => ({
-        id: restaurant.id,
-        name: restaurant.name,
-        description: restaurant.description || undefined,
-        address: restaurant.address || undefined,
-        phone: restaurant.phone || undefined,
-        email: restaurant.email || undefined,
-        cuisine_type: restaurant.cuisine_type || undefined,
-        image_url: restaurant.image_url || undefined,
-        owner_id: restaurant.owner_id || undefined,
-        status: restaurant.status,
-        created_at: restaurant.created_at,
-        profiles: (restaurant.profiles && 
-                  typeof restaurant.profiles === 'object' && 
-                  !('error' in restaurant.profiles) &&
-                  restaurant.profiles !== null)
-          ? {
-              id: restaurant.profiles.id,
-              full_name: restaurant.profiles.full_name,
-              phone: restaurant.profiles.phone,
-              email: restaurant.profiles.email
-            }
-          : null,
-      }));
+      const formattedRestaurants: PendingRestaurant[] = restaurantsData.map(restaurant => {
+        // Handle profiles with proper null checking
+        let profilesData: { id: string; full_name: string; phone: string; email: string; } | null = null;
+        if (restaurant.profiles && 
+            typeof restaurant.profiles === 'object' && 
+            !('error' in restaurant.profiles) &&
+            restaurant.profiles !== null) {
+          profilesData = {
+            id: restaurant.profiles.id,
+            full_name: restaurant.profiles.full_name,
+            phone: restaurant.profiles.phone,
+            email: restaurant.profiles.email
+          };
+        }
+
+        return {
+          id: restaurant.id,
+          name: restaurant.name,
+          description: restaurant.description || undefined,
+          address: restaurant.address || undefined,
+          phone: restaurant.phone || undefined,
+          email: restaurant.email || undefined,
+          cuisine_type: restaurant.cuisine_type || undefined,
+          image_url: restaurant.image_url || undefined,
+          owner_id: restaurant.owner_id || undefined,
+          status: restaurant.status,
+          created_at: restaurant.created_at,
+          profiles: profilesData,
+        };
+      });
       setPendingRestaurants(formattedRestaurants);
 
       // Fetch pending foods
       const foodsData = await AdminService.getPendingFoods();
-      const formattedFoods: PendingFood[] = foodsData.map(food => ({
-        id: food.id,
-        name: food.name,
-        description: food.description || undefined,
-        price: food.price,
-        category: food.category || undefined,
-        image_url: food.image_url || undefined,
-        restaurant_id: food.restaurant_id || undefined,
-        owner_id: food.owner_id || undefined,
-        status: food.status,
-        created_at: food.created_at,
-        restaurants: (food.restaurants && 
-                     typeof food.restaurants === 'object' && 
-                     !('error' in food.restaurants) &&
-                     food.restaurants !== null)
-          ? {
-              id: food.restaurants.id,
-              name: food.restaurants.name
-            }
-          : null,
-        profiles: (food.profiles && 
-                  typeof food.profiles === 'object' && 
-                  !('error' in food.profiles) &&
-                  food.profiles !== null)
-          ? {
-              id: food.profiles.id,
-              full_name: food.profiles.full_name,
-              phone: food.profiles.phone,
-              email: food.profiles.email
-            }
-          : null,
-      }));
+      const formattedFoods: PendingFood[] = foodsData.map(food => {
+        // Handle restaurants with proper null checking
+        let restaurantsData: { id: string; name: string; } | null = null;
+        if (food.restaurants && 
+            typeof food.restaurants === 'object' && 
+            !('error' in food.restaurants) &&
+            food.restaurants !== null) {
+          restaurantsData = {
+            id: food.restaurants.id,
+            name: food.restaurants.name
+          };
+        }
+
+        // Handle profiles with proper null checking
+        let profilesData: { id: string; full_name: string; phone: string; email: string; } | null = null;
+        if (food.profiles && 
+            typeof food.profiles === 'object' && 
+            !('error' in food.profiles) &&
+            food.profiles !== null) {
+          profilesData = {
+            id: food.profiles.id,
+            full_name: food.profiles.full_name,
+            phone: food.profiles.phone,
+            email: food.profiles.email
+          };
+        }
+
+        return {
+          id: food.id,
+          name: food.name,
+          description: food.description || undefined,
+          price: food.price,
+          category: food.category || undefined,
+          image_url: food.image_url || undefined,
+          restaurant_id: food.restaurant_id || undefined,
+          owner_id: food.owner_id || undefined,
+          status: food.status,
+          created_at: food.created_at,
+          restaurants: restaurantsData,
+          profiles: profilesData,
+        };
+      });
       setPendingFoods(formattedFoods);
 
       toast({
