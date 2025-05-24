@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Header from '@/components/Header';
@@ -33,16 +32,15 @@ const MyOrdersPage: React.FC = () => {
   }, [isAuthenticated, isLoading, navigate, activeTab]);
 
   const fetchOrders = async () => {
+    if (!user?.id) return;
+    
     setLoading(true);
     try {
-      const status = activeTab !== 'all' ? activeTab : undefined;
-      const { data, error } = await OrderService.getUserOrders(status);
+      const ordersData = await OrderService.getUserOrders(user.id);
       
-      if (error) throw error;
+      console.log('Orders fetched:', ordersData);
       
-      console.log('Orders fetched:', data);
-      
-      setOrders(data || []);
+      setOrders(ordersData || []);
     } catch (error: any) {
       console.error('Error fetching orders:', error);
       toast({

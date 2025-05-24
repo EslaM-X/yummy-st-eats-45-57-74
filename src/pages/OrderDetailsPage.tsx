@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import Header from '@/components/Header';
@@ -36,16 +37,15 @@ const OrderDetailsPage: React.FC = () => {
   const fetchOrderDetails = async (id: string) => {
     setLoading(true);
     try {
-      const { data, error } = await OrderService.getOrderById(id);
+      const orderData = await OrderService.getOrderById(id);
       
-      if (error) throw error;
-      if (!data) {
+      if (!orderData) {
         throw new Error(language === 'en' ? 'Order not found' : 'لم يتم العثور على الطلب');
       }
       
-      console.log('Order details fetched:', data);
+      console.log('Order details fetched:', orderData);
       
-      setOrder(data);
+      setOrder(orderData);
     } catch (error: any) {
       console.error('Error fetching order details:', error);
       toast({
@@ -70,9 +70,9 @@ const OrderDetailsPage: React.FC = () => {
     
     if (window.confirm(confirmMessage)) {
       try {
-        const { success, error } = await OrderService.cancelOrder(orderId);
+        const success = await OrderService.cancelOrder(orderId);
         
-        if (error) throw error;
+        if (!success) throw new Error('Failed to cancel order');
         
         toast({
           title: language === 'en' ? "Order Cancelled Successfully" : "تم إلغاء الطلب بنجاح",

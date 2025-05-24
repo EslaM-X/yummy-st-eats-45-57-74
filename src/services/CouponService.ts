@@ -1,11 +1,12 @@
-
 import { supabase } from '@/integrations/supabase/client';
 
 export interface Coupon {
   id: string;
   code: string;
   title: string;
+  title_en?: string;
   description?: string;
+  description_en?: string;
   discount_type: 'percentage' | 'fixed_amount';
   discount_value: number;
   minimum_order: number;
@@ -199,7 +200,9 @@ export class CouponService {
         .insert([{
           code: couponData.code,
           title: couponData.title,
+          title_en: couponData.title_en,
           description: couponData.description,
+          description_en: couponData.description_en,
           discount_type: couponData.discount_type,
           discount_value: couponData.discount_value,
           minimum_order: couponData.minimum_order || 0,
@@ -248,6 +251,26 @@ export class CouponService {
     } catch (error) {
       console.error('Exception updating coupon:', error);
       return null;
+    }
+  }
+
+  // حذف كوبون
+  static async deleteCoupon(couponId: string): Promise<boolean> {
+    try {
+      const { error } = await supabase
+        .from('coupons')
+        .delete()
+        .eq('id', couponId);
+
+      if (error) {
+        console.error('Error deleting coupon:', error);
+        return false;
+      }
+
+      return true;
+    } catch (error) {
+      console.error('Exception deleting coupon:', error);
+      return false;
     }
   }
 

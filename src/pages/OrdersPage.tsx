@@ -39,13 +39,13 @@ const OrdersPage: React.FC = () => {
   }, [user, navigate, activeTab]);
 
   const fetchOrders = async () => {
+    if (!user?.id) return;
+    
     setLoading(true);
     try {
-      const status = activeTab !== 'all' ? activeTab : undefined;
-      const { data, error } = await OrderService.getUserOrders(status);
+      const ordersData = await OrderService.getUserOrders(user.id);
       
-      if (error) throw error;
-      setOrders(data || []);
+      setOrders(ordersData || []);
     } catch (error: any) {
       console.error('Error fetching orders:', error);
       toast({

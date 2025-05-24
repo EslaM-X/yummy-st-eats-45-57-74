@@ -1,44 +1,38 @@
-
 import { supabase } from '@/integrations/supabase/client';
+
+export interface Category {
+  id: string;
+  name: string;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface Restaurant {
+  id: string;
+  name: string;
+  address: string;
+  logo_url?: string;
+}
 
 export interface Product {
   id: string;
   name: string;
   description?: string;
   price: number;
-  discount_price?: number;
-  image?: string;
+  image_url?: string;
+  available: boolean;
   restaurant_id?: string;
   category_id?: string;
-  available: boolean;
-  featured: boolean;
-  preparation_time?: number;
-  ingredients?: string[];
-  nutritional_info?: any;
   created_at: string;
   updated_at: string;
-  restaurants?: {
-    id: string;
-    name: string;
-    logo_url?: string;
-  };
-  categories?: {
-    id: string;
-    name: string;
-  };
-}
-
-export interface Category {
-  id: string;
-  name: string;
-  description?: string;
-  image_url?: string;
-  is_active: boolean;
-  created_at: string;
+  restaurants?: Restaurant;
+  categories?: Category;
+  featured?: boolean;
 }
 
 export class ProductService {
-  // جلب جميع المنتجات المتاحة
+  // جلب جميع المنتجات
   static async getAllProducts(): Promise<Product[]> {
     try {
       const { data, error } = await supabase
@@ -48,6 +42,7 @@ export class ProductService {
           restaurants:restaurant_id (
             id,
             name,
+            address,
             logo_url
           ),
           categories:category_id (
@@ -70,23 +65,17 @@ export class ProductService {
     }
   }
 
-  // جلب المنتجات المفلترة
-  static async getFilteredProducts(filters: {
-    search?: string;
-    category?: string;
-    restaurant?: string;
-    minPrice?: number;
-    maxPrice?: number;
-    featured?: boolean;
-  }): Promise<Product[]> {
+  // جلب منتج محدد
+  static async getProductById(productId: string): Promise<Product | null> {
     try {
-      let query = supabase
+      const { data, error } = await supabase
         .from('products')
         .select(`
           *,
           restaurants:restaurant_id (
             id,
             name,
+            address,
             logo_url
           ),
           categories:category_id (
@@ -94,49 +83,86 @@ export class ProductService {
             name
           )
         `)
-        .eq('available', true);
-
-      // تطبيق الفلاتر
-      if (filters.search) {
-        query = query.ilike('name', `%${filters.search}%`);
-      }
-
-      if (filters.category) {
-        query = query.eq('category_id', filters.category);
-      }
-
-      if (filters.restaurant) {
-        query = query.eq('restaurant_id', filters.restaurant);
-      }
-
-      if (filters.minPrice !== undefined) {
-        query = query.gte('price', filters.minPrice);
-      }
-
-      if (filters.maxPrice !== undefined) {
-        query = query.lte('price', filters.maxPrice);
-      }
-
-      if (filters.featured) {
-        query = query.eq('featured', true);
-      }
-
-      const { data, error } = await query.order('created_at', { ascending: false });
+        .eq('id', productId)
+        .single();
 
       if (error) {
-        console.error('Error fetching filtered products:', error);
-        return [];
+        console.error('Error fetching product:', error);
+        return null;
       }
 
-      return data || [];
+      return data;
     } catch (error) {
-      console.error('Exception fetching filtered products:', error);
-      return [];
+      console.error('Exception fetching product:', error);
+      return null;
     }
   }
 
-  // جلب الفئات
-  static async getCategories(): Promise<Category[]> {
+  // إنشاء منتج جديد
+  static async createProduct(productData: Partial<Product>): Promise<Product | null> {
+    try {
+      const { data, error } = await supabase
+        .from('products')
+        .insert([productData])
+        .select()
+        .single();
+
+      if (error) {
+        console.error('Error creating product:', error);
+        return null;
+      }
+
+      return data;
+    } catch (error) {
+      console.error('Exception creating product:', error);
+      return null;
+    }
+  }
+
+  // تحديث منتج
+  static async updateProduct(productId: string, updates: Partial<Product>): Promise<Product | null> {
+    try {
+      const { data, error } = await supabase
+        .from('products')
+        .update(updates)
+        .eq('id', productId)
+        .select()
+        .single();
+
+      if (error) {
+        console.error('Error updating product:', error);
+        return null;
+      }
+
+      return data;
+    } catch (error) {
+      console.error('Exception updating product:', error);
+      return null;
+    }
+  }
+
+  // حذف منتج
+  static async deleteProduct(productId: string): Promise<boolean> {
+    try {
+      const { error } = await supabase
+        .from('products')
+        .delete()
+        .eq('id', productId);
+
+      if (error) {
+        console.error('Error deleting product:', error);
+        return false;
+      }
+
+      return true;
+    } catch (error) {
+      console.error('Exception deleting product:', error);
+      return false;
+    }
+  }
+
+  // جلب جميع الفئات
+  static async getCategories(): Promise<any[]> {
     try {
       const { data, error } = await supabase
         .from('categories')
@@ -156,16 +182,24 @@ export class ProductService {
     }
   }
 
-  // جلب المنتجات المميزة
-  static async getFeaturedProducts(): Promise<Product[]> {
+  // جلب المنتجات مع الفلاتر
+  static async getFilteredProducts(filters: {
+    category?: string;
+    country?: string;
+    search?: string;
+    minPrice?: number;
+    maxPrice?: number;
+    featured?: boolean;
+  } = {}): Promise<Product[]> {
     try {
-      const { data, error } = await supabase
+      let query = supabase
         .from('products')
         .select(`
           *,
           restaurants:restaurant_id (
             id,
             name,
+            address,
             logo_url
           ),
           categories:category_id (
@@ -173,80 +207,41 @@ export class ProductService {
             name
           )
         `)
-        .eq('available', true)
-        .eq('featured', true)
-        .order('created_at', { ascending: false })
-        .limit(10);
+        .eq('available', true);
+
+      // Apply filters
+      if (filters.category) {
+        query = query.eq('category_id', filters.category);
+      }
+
+      if (filters.search) {
+        query = query.or(`name.ilike.%${filters.search}%,description.ilike.%${filters.search}%`);
+      }
+
+      if (filters.minPrice !== undefined) {
+        query = query.gte('price', filters.minPrice);
+      }
+
+      if (filters.maxPrice !== undefined) {
+        query = query.lte('price', filters.maxPrice);
+      }
+
+      if (filters.featured) {
+        query = query.eq('featured', true);
+      }
+
+      query = query.order('created_at', { ascending: false });
+
+      const { data, error } = await query;
 
       if (error) {
-        console.error('Error fetching featured products:', error);
+        console.error('Error fetching filtered products:', error);
         return [];
       }
 
       return data || [];
     } catch (error) {
-      console.error('Exception fetching featured products:', error);
-      return [];
-    }
-  }
-
-  // جلب منتجات مطعم محدد
-  static async getRestaurantProducts(restaurantId: string): Promise<Product[]> {
-    try {
-      const { data, error } = await supabase
-        .from('products')
-        .select(`
-          *,
-          categories:category_id (
-            id,
-            name
-          )
-        `)
-        .eq('restaurant_id', restaurantId)
-        .eq('available', true)
-        .order('name');
-
-      if (error) {
-        console.error('Error fetching restaurant products:', error);
-        return [];
-      }
-
-      return data || [];
-    } catch (error) {
-      console.error('Exception fetching restaurant products:', error);
-      return [];
-    }
-  }
-
-  // البحث في المنتجات
-  static async searchProducts(searchTerm: string): Promise<Product[]> {
-    try {
-      const { data, error } = await supabase
-        .from('products')
-        .select(`
-          *,
-          restaurants:restaurant_id (
-            id,
-            name,
-            logo_url
-          ),
-          categories:category_id (
-            id,
-            name
-          )
-        `)
-        .eq('available', true)
-        .or(`name.ilike.%${searchTerm}%,description.ilike.%${searchTerm}%`)
-        .order('name');
-
-      if (error) {
-        console.error('Error searching products:', error);
-        return [];
-      }
-
-      return data || [];
-    } catch (error) {
-      console.error('Exception searching products:', error);
+      console.error('Exception fetching filtered products:', error);
       return [];
     }
   }

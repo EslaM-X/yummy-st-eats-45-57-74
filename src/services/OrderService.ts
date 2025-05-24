@@ -134,7 +134,11 @@ export class OrderService {
         return [];
       }
 
-      return data || [];
+      return (data || []).map(order => ({
+        ...order,
+        items: Array.isArray(order.items) ? order.items : 
+               typeof order.items === 'string' ? JSON.parse(order.items) : []
+      }));
     } catch (error) {
       console.error('Exception fetching user orders:', error);
       return [];
@@ -172,7 +176,11 @@ export class OrderService {
         return null;
       }
 
-      return data;
+      return {
+        ...data,
+        items: Array.isArray(data.items) ? data.items : 
+               typeof data.items === 'string' ? JSON.parse(data.items) : []
+      };
     } catch (error) {
       console.error('Exception fetching order:', error);
       return null;
@@ -276,7 +284,11 @@ export class OrderService {
         return [];
       }
 
-      return data || [];
+      return (data || []).map(order => ({
+        ...order,
+        items: Array.isArray(order.items) ? order.items : 
+               typeof order.items === 'string' ? JSON.parse(order.items) : []
+      }));
     } catch (error) {
       console.error('Exception fetching restaurant orders:', error);
       return [];
@@ -309,7 +321,11 @@ export class OrderService {
         return [];
       }
 
-      return data || [];
+      return (data || []).map(order => ({
+        ...order,
+        items: Array.isArray(order.items) ? order.items : 
+               typeof order.items === 'string' ? JSON.parse(order.items) : []
+      }));
     } catch (error) {
       console.error('Exception fetching all orders:', error);
       return [];
