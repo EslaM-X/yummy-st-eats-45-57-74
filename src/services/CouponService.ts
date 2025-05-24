@@ -1,3 +1,4 @@
+
 import { supabase } from '@/integrations/supabase/client';
 
 export interface Coupon {
@@ -308,16 +309,24 @@ export class CouponService {
       }
 
       // زيادة عداد الاستخدام للكوبون
-      const { error: updateError } = await supabase
+      const { data: currentCoupon } = await supabase
         .from('coupons')
-        .update({
-          used_count: supabase.sql`used_count + 1`
-        })
-        .eq('id', couponId);
+        .select('used_count')
+        .eq('id', couponId)
+        .single();
 
-      if (updateError) {
-        console.error('Error incrementing coupon usage:', updateError);
-        return false;
+      if (currentCoupon) {
+        const { error: updateError } = await supabase
+          .from('coupons')
+          .update({
+            used_count: currentCoupon.used_count + 1
+          })
+          .eq('id', couponId);
+
+        if (updateError) {
+          console.error('Error incrementing coupon usage:', updateError);
+          return false;
+        }
       }
 
       return true;
