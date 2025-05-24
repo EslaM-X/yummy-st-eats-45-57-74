@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -73,7 +74,11 @@ const AdminPendingContent: React.FC = () => {
         if (restaurant.profiles && 
             typeof restaurant.profiles === 'object' && 
             !('error' in restaurant.profiles) &&
-            restaurant.profiles !== null) {
+            restaurant.profiles !== null &&
+            'id' in restaurant.profiles &&
+            'full_name' in restaurant.profiles &&
+            'phone' in restaurant.profiles &&
+            'email' in restaurant.profiles) {
           profilesData = {
             id: restaurant.profiles.id,
             full_name: restaurant.profiles.full_name,
@@ -107,7 +112,9 @@ const AdminPendingContent: React.FC = () => {
         if (food.restaurants && 
             typeof food.restaurants === 'object' && 
             !('error' in food.restaurants) &&
-            food.restaurants !== null) {
+            food.restaurants !== null &&
+            'id' in food.restaurants &&
+            'name' in food.restaurants) {
           restaurantsData = {
             id: food.restaurants.id,
             name: food.restaurants.name
@@ -119,7 +126,11 @@ const AdminPendingContent: React.FC = () => {
         if (food.profiles && 
             typeof food.profiles === 'object' && 
             !('error' in food.profiles) &&
-            food.profiles !== null) {
+            food.profiles !== null &&
+            'id' in food.profiles &&
+            'full_name' in food.profiles &&
+            'phone' in food.profiles &&
+            'email' in food.profiles) {
           profilesData = {
             id: food.profiles.id,
             full_name: food.profiles.full_name,
