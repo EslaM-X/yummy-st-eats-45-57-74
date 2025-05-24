@@ -18,18 +18,18 @@ export const useMockRestaurants = (
   const [allCuisines, setAllCuisines] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
 
-  // جلب المطاعم الحقيقية من قاعدة البيانات
+  // جلب المطاعم الحقيقية المعتمدة من قاعدة البيانات
   useEffect(() => {
     const fetchRealRestaurants = async () => {
       setLoading(true);
       try {
         const restaurantsData = await RestaurantService.getAllRestaurants();
         
-        // تحويل البيانات إلى تنسيق Restaurant
+        // تحويل البيانات إلى تنسيق Restaurant مع التأكد من وجود الخصائص المطلوبة
         const formattedRestaurants: (Restaurant & { country?: string })[] = restaurantsData.map(restaurant => ({
           id: restaurant.id,
           name: restaurant.name,
-          address: restaurant.address || 'عنوان غير محدد', // Add required address property
+          address: restaurant.address, // مطلوب في نوع Restaurant
           cuisine: Array.isArray(restaurant.cuisine_type) 
             ? restaurant.cuisine_type.join(', ')
             : restaurant.cuisine_type || 'مأكولات متنوعة',

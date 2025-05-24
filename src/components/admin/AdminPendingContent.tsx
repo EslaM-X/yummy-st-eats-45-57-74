@@ -69,11 +69,18 @@ const AdminPendingContent: React.FC = () => {
       const restaurantsData = await AdminService.getPendingRestaurants();
       const formattedRestaurants: PendingRestaurant[] = restaurantsData.map(restaurant => {
         // Check if profiles is valid and not an error object
-        const validProfiles = restaurant.profiles && 
+        const hasValidProfiles = restaurant.profiles && 
           typeof restaurant.profiles === 'object' && 
           !('error' in restaurant.profiles) &&
           restaurant.profiles !== null &&
-          'id' in restaurant.profiles ? restaurant.profiles : null;
+          'id' in restaurant.profiles;
+
+        const validProfiles = hasValidProfiles ? restaurant.profiles as {
+          id: string;
+          full_name: string;
+          phone: string;
+          email: string;
+        } : null;
 
         return {
           id: restaurant.id,
@@ -96,18 +103,30 @@ const AdminPendingContent: React.FC = () => {
       const foodsData = await AdminService.getPendingFoods();
       const formattedFoods: PendingFood[] = foodsData.map(food => {
         // Check if profiles is valid and not an error object
-        const validProfiles = food.profiles && 
+        const hasValidProfiles = food.profiles && 
           typeof food.profiles === 'object' && 
           !('error' in food.profiles) &&
           food.profiles !== null &&
-          'id' in food.profiles ? food.profiles : null;
+          'id' in food.profiles;
+
+        const validProfiles = hasValidProfiles ? food.profiles as {
+          id: string;
+          full_name: string;
+          phone: string;
+          email: string;
+        } : null;
 
         // Check if restaurants is valid and not an error object
-        const validRestaurants = food.restaurants && 
+        const hasValidRestaurants = food.restaurants && 
           typeof food.restaurants === 'object' && 
           !('error' in food.restaurants) &&
           food.restaurants !== null &&
-          'id' in food.restaurants ? food.restaurants : null;
+          'id' in food.restaurants;
+
+        const validRestaurants = hasValidRestaurants ? food.restaurants as {
+          id: string;
+          name: string;
+        } : null;
 
         return {
           id: food.id,
