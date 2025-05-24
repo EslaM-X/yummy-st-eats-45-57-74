@@ -36,7 +36,23 @@ const AdminUsers: React.FC = () => {
     try {
       setLoading(true);
       const data = await AdminService.getAllUsers();
-      setUsers(data);
+      
+      // تنسيق البيانات لتطابق النوع المطلوب
+      const formattedUsers: User[] = data.map(user => ({
+        id: user.id,
+        full_name: user.full_name || '',
+        email: user.email || '',
+        phone: user.phone || '',
+        user_type: (user.user_type === 'customer' || user.user_type === 'restaurant_owner' || user.user_type === 'admin') 
+          ? user.user_type 
+          : 'customer',
+        created_at: user.created_at,
+        updated_at: user.updated_at,
+        address: user.address || undefined,
+        avatar_url: user.avatar_url || undefined,
+      }));
+      
+      setUsers(formattedUsers);
     } catch (error: any) {
       console.error('Error fetching users:', error);
       toast({
