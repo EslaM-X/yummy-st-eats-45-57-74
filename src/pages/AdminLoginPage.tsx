@@ -8,7 +8,7 @@ import { useToast } from '@/hooks/use-toast';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { Eye, EyeOff, Lock, User } from 'lucide-react';
 import { useTheme } from '@/components/theme-provider';
-import { supabase } from '@/integrations/supabase/client';
+import { AdminAuthService } from '@/services/AdminAuthService';
 
 const AdminLoginPage: React.FC = () => {
   const [email, setEmail] = useState('');
@@ -24,18 +24,9 @@ const AdminLoginPage: React.FC = () => {
   // التحقق من وجود جلسة نشطة
   useEffect(() => {
     const checkSession = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (session) {
-        // التحقق من صلاحيات الأدمن
-        const { data: profile } = await supabase
-          .from('profiles')
-          .select('user_type')
-          .eq('id', session.user.id)
-          .single();
-        
-        if (profile?.user_type === 'admin') {
-          navigate('/admin');
-        }
+      const { data } = await AdminAuthService.getSession();
+      if (data?.session) {
+        navigate('/admin');
       }
     };
     
@@ -56,29 +47,13 @@ const AdminLoginPage: React.FC = () => {
     setIsLoading(true);
 
     try {
-      // تسجيل الدخول باستخدام Supabase
-      const { data, error } = await supabase.auth.signInWithPassword({
-        email,
-        password,
-      });
+      const { data, error } = await AdminAuthService.signIn(email, password);
 
       if (error) {
-        throw error;
+        throw new Error(error.message);
       }
 
-      if (data.user) {
-        // التحقق من صلاحيات الأدمن
-        const { data: profile, error: profileError } = await supabase
-          .from('profiles')
-          .select('user_type')
-          .eq('id', data.user.id)
-          .single();
-
-        if (profileError || profile?.user_type !== 'admin') {
-          await supabase.auth.signOut();
-          throw new Error('ليس لديك صلاحيات إدارية');
-        }
-
+      if (data) {
         // حفظ البريد الإلكتروني إذا تم اختيار "تذكرني"
         if (rememberMe) {
           localStorage.setItem('adminEmail', email);
@@ -98,7 +73,7 @@ const AdminLoginPage: React.FC = () => {
       console.error('Login error:', error);
       toast({
         title: "خطأ في تسجيل الدخول",
-        description: error.message || "اسم المستخدم أو كلمة المرور غير صحيحة",
+        description: error.message || "بيانات تسجيل الدخول غير صحيحة",
         variant: "destructive",
       });
     } finally {
@@ -137,7 +112,7 @@ const AdminLoginPage: React.FC = () => {
                       type="email"
                       value={email}
                       onChange={(e) => setEmail(e.target.value)}
-                      placeholder="أدخل البريد الإلكتروني"
+                      placeholder="admin@steat.sa"
                       required
                       className="w-full pr-10 rtl:pr-4 rtl:pl-10 text-gray-900 dark:text-white bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-600"
                     />
@@ -155,7 +130,7 @@ const AdminLoginPage: React.FC = () => {
                     type={showPassword ? "text" : "password"}
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
-                    placeholder="أدخل كلمة المرور"
+                    placeholder="StEatAdmin2025#"
                     required
                     className="w-full pr-10 rtl:pr-4 rtl:pl-10 text-gray-900 dark:text-white bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-600"
                   />
@@ -182,6 +157,13 @@ const AdminLoginPage: React.FC = () => {
                     className="rounded border-gray-300 text-teal-600 shadow-sm focus:border-teal-300 focus:ring focus:ring-teal-200 focus:ring-opacity-50"
                   />
                   <label htmlFor="remember-me" className="text-gray-700 dark:text-gray-300">تذكرني</label>
+                </div>
+              </div>
+              <div className="bg-blue-50 dark:bg-blue-900/20 p-3 rounded-lg border border-blue-200 dark:border-blue-800">
+                <h4 className="text-sm font-medium text-blue-800 dark:text-blue-300 mb-2">بيانات تسجيل الدخول:</h4>
+                <div className="text-xs text-blue-700 dark:text-blue-400 space-y-1">
+                  <p><strong>البريد الإلكتروني:</strong> admin@steat.sa</p>
+                  <p><strong>كلمة المرور:</strong> StEatAdmin2025#</p>
                 </div>
               </div>
             </CardContent>

@@ -2,7 +2,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useToast } from '@/hooks/use-toast';
-import { supabase } from '@/integrations/supabase/client';
+import { AdminAuthService } from '@/services/AdminAuthService';
 
 export const useAdminAuth = () => {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
@@ -19,43 +19,15 @@ export const useAdminAuth = () => {
       try {
         setLoading(true);
         
-        // التحقق من جلسة Supabase
-        const { data: { session }, error } = await supabase.auth.getSession();
+        const { data } = await AdminAuthService.getSession();
         
-        if (error) {
-          console.error('Session error:', error);
-          if (mounted) {
-            setIsAuthenticated(false);
-            setIsAdmin(false);
-            setUser(null);
-          }
-          return;
-        }
-
-        if (session?.user) {
-          // التحقق من صلاحيات الأدمن من قاعدة البيانات
-          const { data: profile, error: profileError } = await supabase
-            .from('profiles')
-            .select('user_type')
-            .eq('id', session.user.id)
-            .single();
-
-          if (profileError) {
-            console.error('Profile error:', profileError);
-            if (mounted) {
-              setIsAuthenticated(false);
-              setIsAdmin(false);
-              setUser(null);
-            }
-            return;
-          }
-
-          const isAdminUser = profile?.user_type === 'admin';
+        if (data?.session?.user) {
+          const isAdminUser = data.session.user.user_metadata?.user_type === 'admin';
           
           if (mounted) {
             setIsAuthenticated(true);
             setIsAdmin(isAdminUser);
-            setUser(session.user);
+            setUser(data.session.user);
           }
         } else {
           if (mounted) {
@@ -80,35 +52,14 @@ export const useAdminAuth = () => {
     
     checkAdminAuth();
 
-    // مراقبة تغييرات المصادقة
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (event, session) => {
-        if (event === 'SIGNED_OUT' || !session) {
-          if (mounted) {
-            setIsAuthenticated(false);
-            setIsAdmin(false);
-            setUser(null);
-          }
-        } else if (event === 'SIGNED_IN' && session) {
-          // إعادة فحص الصلاحيات عند تسجيل الدخول
-          setTimeout(() => {
-            if (mounted) {
-              checkAdminAuth();
-            }
-          }, 100);
-        }
-      }
-    );
-
     return () => {
       mounted = false;
-      subscription.unsubscribe();
     };
   }, []);
 
   const handleLogout = async () => {
     try {
-      const { error } = await supabase.auth.signOut();
+      const { error } = await AdminAuthService.signOut();
       
       if (error) {
         throw error;
@@ -135,7 +86,7 @@ export const useAdminAuth = () => {
   };
 
   const checkAndRedirect = () => {
-    if (loading) return true; // منع إعادة التوجيه أثناء التحميل
+    if (loading) return true;
     
     if (!isAuthenticated) {
       toast({
