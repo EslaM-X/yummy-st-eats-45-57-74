@@ -28,90 +28,97 @@ const AdminDashboard: React.FC = () => {
     pendingOrders: 0,
   });
   const [loading, setLoading] = useState(true);
-
-  // Sample data for charts (سيتم استبdalها لاحقاً ببيانات حقيقية)
-  const [salesData, setSalesData] = useState([
-    { day: 'الأحد', amount: 1200 },
-    { day: 'الإثنين', amount: 1800 },
-    { day: 'الثلاثاء', amount: 1400 },
-    { day: 'الأربعاء', amount: 2200 },
-    { day: 'الخميس', amount: 1600 },
-    { day: 'الجمعة', amount: 2400 },
-    { day: 'السبت', amount: 3000 },
-  ]);
-
+  const [salesData, setSalesData] = useState([]);
   const [topRestaurants, setTopRestaurants] = useState([]);
-
   const [systemAlerts, setSystemAlerts] = useState<Alert[]>([
     { type: "info", title: 'مرحباً بك', message: 'تم ربط لوحة الإدارة بقاعدة البيانات بنجاح' },
-    { type: "warning", title: 'تحديث النظام', message: 'سيتم إجراء صيانة للموقع غداً الساعة 2 صباحاً' },
   ]);
 
   useEffect(() => {
-    const fetchDashboardStats = async () => {
-      try {
-        setLoading(true);
-
-        // جلب عدد المستخدمين
-        const { count: usersCount } = await supabase
-          .from('profiles')
-          .select('*', { count: 'exact', head: true });
-
-        // جلب عدد الطلبات
-        const { count: ordersCount } = await supabase
-          .from('orders')
-          .select('*', { count: 'exact', head: true });
-
-        // جلب عدد المطاعم
-        const { count: restaurantsCount } = await supabase
-          .from('restaurants')
-          .select('*', { count: 'exact', head: true });
-
-        // جلب إجمالي المبيعات
-        const { data: salesData } = await supabase
-          .from('orders')
-          .select('total_amount')
-          .eq('payment_status', 'completed');
-
-        const totalSales = salesData?.reduce((sum, order) => sum + (order.total_amount || 0), 0) || 0;
-
-        // جلب الطلبات المعلقة
-        const { count: pendingOrders } = await supabase
-          .from('orders')
-          .select('*', { count: 'exact', head: true })
-          .eq('status', 'new');
-
-        // جلب أفضل المطاعم
-        const { data: restaurantsData } = await supabase
-          .from('restaurants')
-          .select('name, avg_rating')
-          .order('avg_rating', { ascending: false })
-          .limit(5);
-
-        setStats({
-          usersCount: usersCount || 0,
-          ordersCount: ordersCount || 0,
-          totalSales,
-          restaurantsCount: restaurantsCount || 0,
-          pendingOrders: pendingOrders || 0,
-        });
-
-        setTopRestaurants(restaurantsData || []);
-
-      } catch (error) {
-        console.error('Error fetching dashboard stats:', error);
-        setSystemAlerts(prev => [...prev, {
-          type: "error",
-          title: "خطأ في تحميل البيانات",
-          message: "حدث خطأ أثناء جلب إحصائيات لوحة التحكم"
-        }]);
-      } finally {
-        setLoading(false);
-      }
-    };
-
     fetchDashboardStats();
   }, []);
+
+  const fetchDashboardStats = async () => {
+    try {
+      setLoading(true);
+
+      // جلب عدد المستخدمين
+      const { count: usersCount } = await supabase
+        .from('profiles')
+        .select('*', { count: 'exact', head: true });
+
+      // جلب عدد الطلبات
+      const { count: ordersCount } = await supabase
+        .from('orders')
+        .select('*', { count: 'exact', head: true });
+
+      // جلب عدد المطاعم
+      const { count: restaurantsCount } = await supabase
+        .from('restaurants')
+        .select('*', { count: 'exact', head: true });
+
+      // جلب إجمالي المبيعات
+      const { data: salesData } = await supabase
+        .from('orders')
+        .select('total_amount')
+        .eq('payment_status', 'completed');
+
+      const totalSales = salesData?.reduce((sum, order) => sum + (order.total_amount || 0), 0) || 0;
+
+      // جلب الطلبات المعلقة
+      const { count: pendingOrders } = await supabase
+        .from('orders')
+        .select('*', { count: 'exact', head: true })
+        .eq('status', 'new');
+
+      // جلب أفضل المطاعم
+      const { data: restaurantsData } = await supabase
+        .from('restaurants')
+        .select('name, avg_rating, id')
+        .order('avg_rating', { ascending: false })
+        .limit(5);
+
+      // جلب بيانات المبيعات الأسبوعية
+      const { data: weeklyOrders } = await supabase
+        .from('orders')
+        .select('total_amount, created_at')
+        .eq('payment_status', 'completed')
+        .gte('created_at', new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString());
+
+      // تجميع المبيعات حسب اليوم
+      const salesByDay = weeklyOrders?.reduce((acc, order) => {
+        const day = new Date(order.created_at).toLocaleDateString('ar-SA', { weekday: 'long' });
+        acc[day] = (acc[day] || 0) + order.total_amount;
+        return acc;
+      }, {} as Record<string, number>) || {};
+
+      const formattedSalesData = Object.entries(salesByDay).map(([day, amount]) => ({
+        day,
+        amount
+      }));
+
+      setStats({
+        usersCount: usersCount || 0,
+        ordersCount: ordersCount || 0,
+        totalSales,
+        restaurantsCount: restaurantsCount || 0,
+        pendingOrders: pendingOrders || 0,
+      });
+
+      setTopRestaurants(restaurantsData || []);
+      setSalesData(formattedSalesData);
+
+    } catch (error) {
+      console.error('Error fetching dashboard stats:', error);
+      setSystemAlerts(prev => [...prev, {
+        type: "error",
+        title: "خطأ في تحميل البيانات",
+        message: "حدث خطأ أثناء جلب إحصائيات لوحة التحكم"
+      }]);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   if (loading) {
     return (
@@ -197,7 +204,7 @@ const AdminDashboard: React.FC = () => {
                 </CardDescription>
               </CardHeader>
               <CardContent>
-                <SalesChart data={salesData} maxValue={3000} />
+                <SalesChart data={salesData} maxValue={Math.max(...salesData.map(d => d.amount), 1000)} />
               </CardContent>
             </Card>
           </div>

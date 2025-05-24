@@ -7,14 +7,22 @@ import { useToast } from "@/hooks/use-toast";
 import { useAuth } from '@/contexts/AuthContext';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { RestaurantService } from '@/services/RestaurantService';
+import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Store, Plus, Eye, Edit, Settings, TrendingUp, Clock, Star } from 'lucide-react';
+import { Store, Plus, Eye, Edit, Settings, TrendingUp, Clock, Star, ShoppingBag } from 'lucide-react';
 
 const RestaurantDashboardPage: React.FC = () => {
   const [restaurants, setRestaurants] = useState<any[]>([]);
+  const [orders, setOrders] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [stats, setStats] = useState({
+    totalOrders: 0,
+    pendingOrders: 0,
+    todayRevenue: 0,
+    totalRevenue: 0
+  });
   const { toast } = useToast();
   const navigate = useNavigate();
   const { user, isAuthenticated, isLoading } = useAuth();
@@ -36,8 +44,43 @@ const RestaurantDashboardPage: React.FC = () => {
     
     setLoading(true);
     try {
-      const data = await RestaurantService.getUserRestaurants(user.id);
-      setRestaurants(data);
+      // جلب مطاعم المستخدم
+      const restaurantData = await RestaurantService.getUserRestaurants(user.id);
+      setRestaurants(restaurantData);
+
+      // جلب الطلبات لمطاعم المستخدم
+      if (restaurantData.length > 0) {
+        const restaurantIds = restaurantData.map(r => r.id);
+        const { data: ordersData } = await supabase
+          .from('orders')
+          .select(`
+            *,
+            profiles!orders_user_id_fkey(full_name, phone)
+          `)
+          .in('restaurant_id', restaurantIds)
+          .order('created_at', { ascending: false });
+
+        setOrders(ordersData || []);
+
+        // حساب الإحصائيات
+        const totalOrders = ordersData?.length || 0;
+        const pendingOrders = ordersData?.filter(order => ['new', 'قيد التحضير'].includes(order.status)).length || 0;
+        const totalRevenue = ordersData?.filter(order => order.payment_status === 'completed')
+          .reduce((sum, order) => sum + (order.total_amount || 0), 0) || 0;
+        
+        const today = new Date().toDateString();
+        const todayRevenue = ordersData?.filter(order => 
+          order.payment_status === 'completed' && 
+          new Date(order.created_at).toDateString() === today
+        ).reduce((sum, order) => sum + (order.total_amount || 0), 0) || 0;
+
+        setStats({
+          totalOrders,
+          pendingOrders,
+          todayRevenue,
+          totalRevenue
+        });
+      }
     } catch (error: any) {
       console.error('Error fetching restaurants:', error);
       toast({
@@ -49,6 +92,40 @@ const RestaurantDashboardPage: React.FC = () => {
       });
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleUpdateRestaurantStatus = async (restaurantId: string, isActive: boolean) => {
+    try {
+      const { error } = await supabase
+        .from('restaurants')
+        .update({ is_active: isActive })
+        .eq('id', restaurantId)
+        .eq('owner_id', user?.id);
+
+      if (error) throw error;
+
+      setRestaurants(prev => prev.map(restaurant => 
+        restaurant.id === restaurantId 
+          ? { ...restaurant, is_active: isActive }
+          : restaurant
+      ));
+
+      toast({
+        title: language === 'en' ? "Status Updated" : "تم تحديث الحالة",
+        description: language === 'en' 
+          ? `Restaurant ${isActive ? 'activated' : 'deactivated'} successfully`
+          : `تم ${isActive ? 'تفعيل' : 'إلغاء تفعيل'} المطعم بنجاح`,
+      });
+    } catch (error: any) {
+      console.error('Error updating restaurant status:', error);
+      toast({
+        title: language === 'en' ? "Error" : "خطأ",
+        description: error.message || (language === 'en' 
+          ? "Failed to update restaurant status" 
+          : "فشل في تحديث حالة المطعم"),
+        variant: "destructive",
+      });
     }
   };
 
@@ -87,6 +164,59 @@ const RestaurantDashboardPage: React.FC = () => {
             </Button>
           </div>
 
+          {/* إحصائيات سريعة */}
+          {restaurants.length > 0 && (
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
+              <Card>
+                <CardContent className="p-4">
+                  <div className="flex items-center">
+                    <ShoppingBag className="h-8 w-8 text-blue-500" />
+                    <div className="ml-4 rtl:ml-0 rtl:mr-4">
+                      <p className="text-sm text-gray-600 dark:text-gray-400">إجمالي الطلبات</p>
+                      <p className="text-2xl font-bold">{stats.totalOrders}</p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+              
+              <Card>
+                <CardContent className="p-4">
+                  <div className="flex items-center">
+                    <Clock className="h-8 w-8 text-amber-500" />
+                    <div className="ml-4 rtl:ml-0 rtl:mr-4">
+                      <p className="text-sm text-gray-600 dark:text-gray-400">طلبات معلقة</p>
+                      <p className="text-2xl font-bold">{stats.pendingOrders}</p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+              
+              <Card>
+                <CardContent className="p-4">
+                  <div className="flex items-center">
+                    <TrendingUp className="h-8 w-8 text-green-500" />
+                    <div className="ml-4 rtl:ml-0 rtl:mr-4">
+                      <p className="text-sm text-gray-600 dark:text-gray-400">مبيعات اليوم</p>
+                      <p className="text-2xl font-bold">{stats.todayRevenue.toFixed(2)} ST</p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+              
+              <Card>
+                <CardContent className="p-4">
+                  <div className="flex items-center">
+                    <TrendingUp className="h-8 w-8 text-purple-500" />
+                    <div className="ml-4 rtl:ml-0 rtl:mr-4">
+                      <p className="text-sm text-gray-600 dark:text-gray-400">إجمالي المبيعات</p>
+                      <p className="text-2xl font-bold">{stats.totalRevenue.toFixed(2)} ST</p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+          )}
+
           {restaurants.length === 0 ? (
             <Card className="text-center py-12">
               <CardContent>
@@ -107,9 +237,9 @@ const RestaurantDashboardPage: React.FC = () => {
               {restaurants.map((restaurant) => (
                 <Card key={restaurant.id} className="overflow-hidden hover:shadow-lg transition-shadow">
                   <div className="relative">
-                    {restaurant.cover_image_url ? (
+                    {restaurant.logo_url ? (
                       <img 
-                        src={restaurant.cover_image_url} 
+                        src={restaurant.logo_url} 
                         alt={restaurant.name}
                         className="w-full h-48 object-cover"
                       />
@@ -134,11 +264,11 @@ const RestaurantDashboardPage: React.FC = () => {
                       <span className="truncate">{restaurant.name}</span>
                       <div className="flex items-center">
                         <Star className="h-4 w-4 text-yellow-500 mr-1" />
-                        <span className="text-sm">{restaurant.rating}</span>
+                        <span className="text-sm">{restaurant.avg_rating?.toFixed(1) || '0.0'}</span>
                       </div>
                     </CardTitle>
                     <p className="text-sm text-gray-600 dark:text-gray-400 line-clamp-2">
-                      {restaurant.description}
+                      {restaurant.description || restaurant.address}
                     </p>
                   </CardHeader>
                   
@@ -146,22 +276,30 @@ const RestaurantDashboardPage: React.FC = () => {
                     <div className="space-y-2 mb-4">
                       <div className="flex items-center text-sm">
                         <Clock className="h-4 w-4 mr-2 text-gray-500" />
-                        <span>{restaurant.estimated_delivery_time}</span>
+                        <span>الطلبات: {orders.filter(o => o.restaurant_id === restaurant.id).length}</span>
                       </div>
                       <div className="flex items-center text-sm">
                         <TrendingUp className="h-4 w-4 mr-2 text-gray-500" />
                         <span>
-                          {language === 'en' ? 'Min Order:' : 'أقل طلب:'} {restaurant.minimum_order} ST
+                          المبيعات: {orders.filter(o => o.restaurant_id === restaurant.id && o.payment_status === 'completed')
+                            .reduce((sum, order) => sum + (order.total_amount || 0), 0).toFixed(2)} ST
                         </span>
                       </div>
                     </div>
                     
                     <div className="flex gap-2">
-                      <Button variant="outline" size="sm" className="flex-1">
-                        <Eye className="h-4 w-4 mr-1" />
-                        {language === 'en' ? 'View' : 'عرض'}
+                      <Button 
+                        variant={restaurant.is_active ? "destructive" : "default"} 
+                        size="sm" 
+                        className="flex-1"
+                        onClick={() => handleUpdateRestaurantStatus(restaurant.id, !restaurant.is_active)}
+                      >
+                        {restaurant.is_active 
+                          ? (language === 'en' ? 'Deactivate' : 'إلغاء التفعيل')
+                          : (language === 'en' ? 'Activate' : 'تفعيل')
+                        }
                       </Button>
-                      <Button variant="outline" size="sm" className="flex-1">
+                      <Button variant="outline" size="sm">
                         <Edit className="h-4 w-4 mr-1" />
                         {language === 'en' ? 'Edit' : 'تعديل'}
                       </Button>
