@@ -72,6 +72,7 @@ const AdminPendingContent: React.FC = () => {
         const validProfiles = restaurant.profiles && 
           typeof restaurant.profiles === 'object' && 
           !('error' in restaurant.profiles) &&
+          restaurant.profiles !== null &&
           'id' in restaurant.profiles ? restaurant.profiles : null;
 
         return {
@@ -98,12 +99,14 @@ const AdminPendingContent: React.FC = () => {
         const validProfiles = food.profiles && 
           typeof food.profiles === 'object' && 
           !('error' in food.profiles) &&
+          food.profiles !== null &&
           'id' in food.profiles ? food.profiles : null;
 
         // Check if restaurants is valid and not an error object
         const validRestaurants = food.restaurants && 
           typeof food.restaurants === 'object' && 
           !('error' in food.restaurants) &&
+          food.restaurants !== null &&
           'id' in food.restaurants ? food.restaurants : null;
 
         return {
