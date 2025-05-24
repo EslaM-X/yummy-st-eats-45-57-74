@@ -91,6 +91,6 @@ export class AdminAuthService {
    */
   static isAdmin(): boolean {
     const { data } = this.getSession();
-    return !!data.session?.user?.role === 'admin';
+    return data.session?.user?.role === 'admin';
   }
 }
