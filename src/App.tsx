@@ -84,6 +84,11 @@ function App() {
           path="/restaurant-dashboard" 
           element={user ? <RestaurantDashboardPage /> : <Navigate to="/auth" />} 
         />
+        {/* إضافة مسار my-restaurant لإعادة التوجيه إلى لوحة تحكم المطاعم */}
+        <Route 
+          path="/my-restaurant" 
+          element={user ? <Navigate to="/restaurant-dashboard" replace /> : <Navigate to="/auth" />} 
+        />
         <Route 
           path="/profile" 
           element={user ? <ProfilePage /> : <Navigate to="/auth" />} 

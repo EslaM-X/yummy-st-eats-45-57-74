@@ -67,7 +67,7 @@ const CouponsPage: React.FC = () => {
         
         toast({
           title: t('coupon_claimed'),
-          description: t('coupon_claimed_description').replace('{title}', coupon.title),
+          description: t('coupon_claimed_description').replace('{title}', getCouponTitle(coupon)),
         });
       } else {
         toast({
@@ -84,6 +84,22 @@ const CouponsPage: React.FC = () => {
         variant: "destructive",
       });
     }
+  };
+
+  // Get coupon title based on language
+  const getCouponTitle = (coupon: Coupon) => {
+    if (language === 'en') {
+      return coupon.title_en || coupon.title;
+    }
+    return coupon.title;
+  };
+
+  // Get coupon description based on language
+  const getCouponDescription = (coupon: Coupon) => {
+    if (language === 'en') {
+      return coupon.description_en || coupon.description;
+    }
+    return coupon.description;
   };
 
   // Format discount display
@@ -216,10 +232,10 @@ const CouponsPage: React.FC = () => {
                             {formatDiscount(coupon)}
                           </Badge>
                           <CardTitle className="text-2xl font-bold mb-2 group-hover:text-orange-600 transition-colors">
-                            {coupon.title}
+                            {getCouponTitle(coupon)}
                           </CardTitle>
                           <CardDescription className="text-base leading-relaxed">
-                            {coupon.description}
+                            {getCouponDescription(coupon)}
                           </CardDescription>
                         </div>
                       </CardHeader>
@@ -296,10 +312,10 @@ const CouponsPage: React.FC = () => {
                               {userCoupon.coupon && formatDiscount(userCoupon.coupon)}
                             </Badge>
                             <CardTitle className="text-2xl font-bold mb-2 group-hover:text-green-600 transition-colors">
-                              {userCoupon.coupon?.title}
+                              {userCoupon.coupon && getCouponTitle(userCoupon.coupon)}
                             </CardTitle>
                             <CardDescription className="text-base leading-relaxed">
-                              {userCoupon.coupon?.description}
+                              {userCoupon.coupon && getCouponDescription(userCoupon.coupon)}
                             </CardDescription>
                           </div>
                         </CardHeader>
