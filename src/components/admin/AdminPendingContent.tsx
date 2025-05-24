@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -69,6 +68,12 @@ const AdminPendingContent: React.FC = () => {
       // Fetch pending restaurants
       const restaurantsData = await AdminService.getPendingRestaurants();
       const formattedRestaurants: PendingRestaurant[] = restaurantsData.map(restaurant => {
+        // Check if profiles is valid and not an error object
+        const validProfiles = restaurant.profiles && 
+          typeof restaurant.profiles === 'object' && 
+          !('error' in restaurant.profiles) &&
+          'id' in restaurant.profiles ? restaurant.profiles : null;
+
         return {
           id: restaurant.id,
           name: restaurant.name,
@@ -81,7 +86,7 @@ const AdminPendingContent: React.FC = () => {
           owner_id: restaurant.owner_id || undefined,
           status: restaurant.status,
           created_at: restaurant.created_at,
-          profiles: restaurant.profiles || null,
+          profiles: validProfiles,
         };
       });
       setPendingRestaurants(formattedRestaurants);
@@ -89,6 +94,18 @@ const AdminPendingContent: React.FC = () => {
       // Fetch pending foods
       const foodsData = await AdminService.getPendingFoods();
       const formattedFoods: PendingFood[] = foodsData.map(food => {
+        // Check if profiles is valid and not an error object
+        const validProfiles = food.profiles && 
+          typeof food.profiles === 'object' && 
+          !('error' in food.profiles) &&
+          'id' in food.profiles ? food.profiles : null;
+
+        // Check if restaurants is valid and not an error object
+        const validRestaurants = food.restaurants && 
+          typeof food.restaurants === 'object' && 
+          !('error' in food.restaurants) &&
+          'id' in food.restaurants ? food.restaurants : null;
+
         return {
           id: food.id,
           name: food.name,
@@ -100,8 +117,8 @@ const AdminPendingContent: React.FC = () => {
           owner_id: food.owner_id || undefined,
           status: food.status,
           created_at: food.created_at,
-          restaurants: food.restaurants || null,
-          profiles: food.profiles || null,
+          restaurants: validRestaurants,
+          profiles: validProfiles,
         };
       });
       setPendingFoods(formattedFoods);
@@ -221,81 +238,85 @@ const AdminPendingContent: React.FC = () => {
             </Card>
           ) : (
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              {pendingRestaurants.map((restaurant) => (
-                <Card key={restaurant.id} className="overflow-hidden">
-                  <CardHeader>
-                    <div className="flex items-center justify-between">
-                      <Badge variant="secondary" className="bg-yellow-100 text-yellow-800">
-                        <Clock className="h-3 w-3 mr-1" />
-                        معلق
-                      </Badge>
-                      <span className="text-sm text-gray-500">
-                        {new Date(restaurant.created_at).toLocaleDateString('ar')}
-                      </span>
-                    </div>
-                    <CardTitle>{restaurant.name}</CardTitle>
-                    <CardDescription>{restaurant.description}</CardDescription>
-                  </CardHeader>
-                  <CardContent className="space-y-4">
-                    <div className="space-y-2 text-sm">
-                      {restaurant.address && (
-                        <p><strong>العنوان:</strong> {restaurant.address}</p>
-                      )}
-                      {restaurant.phone && (
-                        <p><strong>الهاتف:</strong> {restaurant.phone}</p>
-                      )}
-                      {restaurant.email && (
-                        <p><strong>البريد:</strong> {restaurant.email}</p>
-                      )}
-                      {restaurant.cuisine_type && (
-                        <p><strong>نوع المطبخ:</strong> {restaurant.cuisine_type}</p>
-                      )}
-                      {restaurant.profiles && (
-                        <p><strong>المالك:</strong> {restaurant.profiles.full_name}</p>
-                      )}
-                    </div>
-                    
-                    <div>
-                      <label className="block text-sm font-medium mb-2">ملاحظات الإدارة:</label>
-                      <Textarea
-                        value={adminNotes[restaurant.id] || ''}
-                        onChange={(e) => setAdminNotes({
-                          ...adminNotes,
-                          [restaurant.id]: e.target.value
-                        })}
-                        placeholder="أضف ملاحظات..."
-                        className="min-h-[80px]"
-                      />
-                    </div>
-                    
-                    <div className="flex gap-2">
-                      <Button
-                        className="flex-1 bg-green-600 hover:bg-green-700"
-                        onClick={() => handleRestaurantAction(
-                          restaurant.id, 
-                          'approved', 
-                          adminNotes[restaurant.id] || ''
+              {pendingRestaurants.map((restaurant) => {
+                const profiles = restaurant.profiles;
+                
+                return (
+                  <Card key={restaurant.id} className="overflow-hidden">
+                    <CardHeader>
+                      <div className="flex items-center justify-between">
+                        <Badge variant="secondary" className="bg-yellow-100 text-yellow-800">
+                          <Clock className="h-3 w-3 mr-1" />
+                          معلق
+                        </Badge>
+                        <span className="text-sm text-gray-500">
+                          {new Date(restaurant.created_at).toLocaleDateString('ar')}
+                        </span>
+                      </div>
+                      <CardTitle>{restaurant.name}</CardTitle>
+                      <CardDescription>{restaurant.description}</CardDescription>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                      <div className="space-y-2 text-sm">
+                        {restaurant.address && (
+                          <p><strong>العنوان:</strong> {restaurant.address}</p>
                         )}
-                      >
-                        <Check className="h-4 w-4 ml-1" />
-                        موافقة
-                      </Button>
-                      <Button
-                        variant="destructive"
-                        className="flex-1"
-                        onClick={() => handleRestaurantAction(
-                          restaurant.id, 
-                          'rejected', 
-                          adminNotes[restaurant.id] || ''
+                        {restaurant.phone && (
+                          <p><strong>الهاتف:</strong> {restaurant.phone}</p>
                         )}
-                      >
-                        <X className="h-4 w-4 ml-1" />
-                        رفض
-                      </Button>
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
+                        {restaurant.email && (
+                          <p><strong>البريد:</strong> {restaurant.email}</p>
+                        )}
+                        {restaurant.cuisine_type && (
+                          <p><strong>نوع المطبخ:</strong> {restaurant.cuisine_type}</p>
+                        )}
+                        {profiles && (
+                          <p><strong>المالك:</strong> {profiles.full_name}</p>
+                        )}
+                      </div>
+                      
+                      <div>
+                        <label className="block text-sm font-medium mb-2">ملاحظات الإدارة:</label>
+                        <Textarea
+                          value={adminNotes[restaurant.id] || ''}
+                          onChange={(e) => setAdminNotes({
+                            ...adminNotes,
+                            [restaurant.id]: e.target.value
+                          })}
+                          placeholder="أضف ملاحظات..."
+                          className="min-h-[80px]"
+                        />
+                      </div>
+                      
+                      <div className="flex gap-2">
+                        <Button
+                          className="flex-1 bg-green-600 hover:bg-green-700"
+                          onClick={() => handleRestaurantAction(
+                            restaurant.id, 
+                            'approved', 
+                            adminNotes[restaurant.id] || ''
+                          )}
+                        >
+                          <Check className="h-4 w-4 ml-1" />
+                          موافقة
+                        </Button>
+                        <Button
+                          variant="destructive"
+                          className="flex-1"
+                          onClick={() => handleRestaurantAction(
+                            restaurant.id, 
+                            'rejected', 
+                            adminNotes[restaurant.id] || ''
+                          )}
+                        >
+                          <X className="h-4 w-4 ml-1" />
+                          رفض
+                        </Button>
+                      </div>
+                    </CardContent>
+                  </Card>
+                );
+              })}
             </div>
           )}
         </TabsContent>
@@ -311,76 +332,81 @@ const AdminPendingContent: React.FC = () => {
             </Card>
           ) : (
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              {pendingFoods.map((food) => (
-                <Card key={food.id} className="overflow-hidden">
-                  <CardHeader>
-                    <div className="flex items-center justify-between">
-                      <Badge variant="secondary" className="bg-yellow-100 text-yellow-800">
-                        <Clock className="h-3 w-3 mr-1" />
-                        معلق
-                      </Badge>
-                      <span className="text-sm text-gray-500">
-                        {new Date(food.created_at).toLocaleDateString('ar')}
-                      </span>
-                    </div>
-                    <CardTitle>{food.name}</CardTitle>
-                    <CardDescription>{food.description}</CardDescription>
-                  </CardHeader>
-                  <CardContent className="space-y-4">
-                    <div className="space-y-2 text-sm">
-                      <p><strong>السعر:</strong> {food.price} ريال</p>
-                      {food.category && (
-                        <p><strong>الفئة:</strong> {food.category}</p>
-                      )}
-                      {food.restaurants && (
-                        <p><strong>المطعم:</strong> {food.restaurants.name}</p>
-                      )}
-                      {food.profiles && (
-                        <p><strong>المالك:</strong> {food.profiles.full_name}</p>
-                      )}
-                    </div>
-                    
-                    <div>
-                      <label className="block text-sm font-medium mb-2">ملاحظات الإدارة:</label>
-                      <Textarea
-                        value={adminNotes[food.id] || ''}
-                        onChange={(e) => setAdminNotes({
-                          ...adminNotes,
-                          [food.id]: e.target.value
-                        })}
-                        placeholder="أضف ملاحظات..."
-                        className="min-h-[80px]"
-                      />
-                    </div>
-                    
-                    <div className="flex gap-2">
-                      <Button
-                        className="flex-1 bg-green-600 hover:bg-green-700"
-                        onClick={() => handleFoodAction(
-                          food.id, 
-                          'approved', 
-                          adminNotes[food.id] || ''
+              {pendingFoods.map((food) => {
+                const profiles = food.profiles;
+                const restaurants = food.restaurants;
+                
+                return (
+                  <Card key={food.id} className="overflow-hidden">
+                    <CardHeader>
+                      <div className="flex items-center justify-between">
+                        <Badge variant="secondary" className="bg-yellow-100 text-yellow-800">
+                          <Clock className="h-3 w-3 mr-1" />
+                          معلق
+                        </Badge>
+                        <span className="text-sm text-gray-500">
+                          {new Date(food.created_at).toLocaleDateString('ar')}
+                        </span>
+                      </div>
+                      <CardTitle>{food.name}</CardTitle>
+                      <CardDescription>{food.description}</CardDescription>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                      <div className="space-y-2 text-sm">
+                        <p><strong>السعر:</strong> {food.price} ريال</p>
+                        {food.category && (
+                          <p><strong>الفئة:</strong> {food.category}</p>
                         )}
-                      >
-                        <Check className="h-4 w-4 ml-1" />
-                        موافقة
-                      </Button>
-                      <Button
-                        variant="destructive"
-                        className="flex-1"
-                        onClick={() => handleFoodAction(
-                          food.id, 
-                          'rejected', 
-                          adminNotes[food.id] || ''
+                        {restaurants && (
+                          <p><strong>المطعم:</strong> {restaurants.name}</p>
                         )}
-                      >
-                        <X className="h-4 w-4 ml-1" />
-                        رفض
-                      </Button>
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
+                        {profiles && (
+                          <p><strong>المالك:</strong> {profiles.full_name}</p>
+                        )}
+                      </div>
+                      
+                      <div>
+                        <label className="block text-sm font-medium mb-2">ملاحظات الإدارة:</label>
+                        <Textarea
+                          value={adminNotes[food.id] || ''}
+                          onChange={(e) => setAdminNotes({
+                            ...adminNotes,
+                            [food.id]: e.target.value
+                          })}
+                          placeholder="أضف ملاحظات..."
+                          className="min-h-[80px]"
+                        />
+                      </div>
+                      
+                      <div className="flex gap-2">
+                        <Button
+                          className="flex-1 bg-green-600 hover:bg-green-700"
+                          onClick={() => handleFoodAction(
+                            food.id, 
+                            'approved', 
+                            adminNotes[food.id] || ''
+                          )}
+                        >
+                          <Check className="h-4 w-4 ml-1" />
+                          موافقة
+                        </Button>
+                        <Button
+                          variant="destructive"
+                          className="flex-1"
+                          onClick={() => handleFoodAction(
+                            food.id, 
+                            'rejected', 
+                            adminNotes[food.id] || ''
+                          )}
+                        >
+                          <X className="h-4 w-4 ml-1" />
+                          رفض
+                        </Button>
+                      </div>
+                    </CardContent>
+                  </Card>
+                );
+              })}
             </div>
           )}
         </TabsContent>
