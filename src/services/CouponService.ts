@@ -308,9 +308,12 @@ export class CouponService {
       }
 
       // زيادة عداد الاستخدام للكوبون
-      const { error: updateError } = await supabase.rpc('increment_coupon_usage', {
-        coupon_id: couponId
-      });
+      const { error: updateError } = await supabase
+        .from('coupons')
+        .update({
+          used_count: supabase.sql`used_count + 1`
+        })
+        .eq('id', couponId);
 
       if (updateError) {
         console.error('Error incrementing coupon usage:', updateError);

@@ -5,8 +5,8 @@ import Footer from '@/components/Footer';
 import SearchBar from '@/components/products/SearchBar';
 import FilterSection from '@/components/products/FilterSection';
 import ProductsGrid from '@/components/products/ProductsGrid';
-import { getCategories, getFilteredProducts } from '@/services/ProductService';
-import { Product, Category } from '@/types';
+import { ProductService } from '@/services/ProductService';
+import { Product } from '@/types';
 import AdPlaceholder from '@/components/AdPlaceholder';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useSelectedCountry } from '@/components/header/HeaderActionButtons';
@@ -33,7 +33,7 @@ const ProductsPage: React.FC = () => {
     const fetchCategories = async () => {
       try {
         setIsLoading(true);
-        const categoriesData = await getCategories();
+        const categoriesData = await ProductService.getCategories();
         if (categoriesData && categoriesData.length > 0) {
           // Extract category names for the filter
           const categoryNames = categoriesData.map(cat => cat.name);
@@ -64,7 +64,11 @@ const ProductsPage: React.FC = () => {
         const countryToUse = selectedCountry || globalSelectedCountry;
         
         // Get filtered products
-        const filteredProducts = await getFilteredProducts(searchTerm, selectedCategory, sortBy, countryToUse);
+        const filteredProducts = await ProductService.getFilteredProducts({
+          search: searchTerm,
+          category: selectedCategory,
+          country: countryToUse
+        });
         
         // Map products to match Product type
         const mappedProducts: Product[] = filteredProducts.map((product: any) => ({
@@ -75,9 +79,9 @@ const ProductsPage: React.FC = () => {
           imageUrl: product.image_url,
           restaurant: product.restaurants ? product.restaurants.name : t('unknown'),
           category: product.categories ? product.categories.name : t('other'),
-          isAvailable: product.is_available,
+          isAvailable: product.available,
           isFeatured: product.featured,
-          available: product.is_available,
+          available: product.available,
           bestseller: product.featured,
           discount_percent: product.discount_percent,
           ingredients: product.ingredients || [],

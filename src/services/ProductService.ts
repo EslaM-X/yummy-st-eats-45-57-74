@@ -1,3 +1,4 @@
+
 import { supabase } from '@/integrations/supabase/client';
 
 export interface Category {
@@ -27,7 +28,7 @@ export interface Product {
   created_at: string;
   updated_at: string;
   restaurants?: Restaurant;
-  categories?: Category;
+  categories?: { id: string; name: string; };
   featured?: boolean;
 }
 
@@ -103,7 +104,15 @@ export class ProductService {
     try {
       const { data, error } = await supabase
         .from('products')
-        .insert([productData])
+        .insert([{
+          name: productData.name!,
+          price: productData.price!,
+          description: productData.description,
+          category_id: productData.category_id,
+          restaurant_id: productData.restaurant_id,
+          available: productData.available ?? true,
+          featured: productData.featured ?? false
+        }])
         .select()
         .single();
 
@@ -162,7 +171,7 @@ export class ProductService {
   }
 
   // جلب جميع الفئات
-  static async getCategories(): Promise<any[]> {
+  static async getCategories(): Promise<Category[]> {
     try {
       const { data, error } = await supabase
         .from('categories')
@@ -246,3 +255,7 @@ export class ProductService {
     }
   }
 }
+
+// Export functions for backward compatibility
+export const getCategories = ProductService.getCategories;
+export const getFilteredProducts = ProductService.getFilteredProducts;
