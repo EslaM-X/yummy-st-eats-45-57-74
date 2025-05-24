@@ -23,27 +23,25 @@ export interface Restaurant {
   updated_at: string;
 }
 
-// Database types to match Supabase schema
+// Database types to match Supabase schema exactly
 interface DatabaseRestaurant {
   id?: string;
-  name?: string;
+  name: string; // Required field
   description?: string;
-  address: string;
+  address: string; // Required field
   phone?: string;
-  email?: string;
   logo_url?: string;
-  cover_image_url?: string;
   cuisine_type?: string[];
   avg_rating?: number;
   delivery_fee?: number;
   min_order_amount?: number;
-  estimated_delivery_time?: string;
   is_active?: boolean;
   opening_hours?: any;
-  location_id?: string;
   owner_id?: string;
   created_at?: string;
   updated_at?: string;
+  rating?: number;
+  rating_count?: number;
 }
 
 export class RestaurantService {
